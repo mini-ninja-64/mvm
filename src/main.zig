@@ -1,12 +1,12 @@
 const std = @import("std");
 const cpu = @import("cpu.zig").cpu;
 
-const ADD: u32 = 0b0000000000000000;
-const ADD_CONSTANT: u32 = 0b0001000000000000;
-const SUBTRACT: u32 = 0b0010000000000000;
-const SUBTRACT_CONSTANT: u32 = 0b0011000000000000;
-
+const ADD_CONSTANT: u32 = 0b0000000000000000;
+const ADD: u32 = 0b0001000000000000;
+const SUBTRACT_CONSTANT: u32 = 0b0010000000000000;
+const SUBTRACT: u32 = 0b0011000000000000;
 const WRITE_CONSTANT: u32 = 0b0100000000000000;
+const COPY_REGISTER: u32 = 0b1110000000000000;
 
 pub fn registerAsArgument(register: u4, argumentIndex: u4) u32 {
     return @intCast(u32, register) << (2 - argumentIndex) * 4;
@@ -39,6 +39,14 @@ pub fn main() !void {
         registerAsArgument(0, 0) |
         constantAsArgument(5));
 
+    c.execute(COPY_REGISTER |
+        registerAsArgument(2, 1) |
+        registerAsArgument(0, 2));
+
+    printCpu(&c);
+}
+
+fn printCpu(c: *cpu) void {
     std.debug.print("Reg 0: {}\n", .{c.registers[0]});
     std.debug.print("Reg 1: {}\n", .{c.registers[1]});
     std.debug.print("Reg 2: {}\n", .{c.registers[2]});
