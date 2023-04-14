@@ -13,7 +13,7 @@ test "Successfully extracts nibbles" {
 }
 
 fn getByte(instruction: u32, byteIndex: u1) u8 {
-    return @intCast(u8, (instruction >> (@intCast(u5, 1 - byteIndex) * 2)) & 0xFF);
+    return @intCast(u8, (instruction >> (@intCast(u5, 1 - byteIndex) * 8)) & 0xFF);
 }
 
 test "Successfully extracts bytes" {
@@ -21,11 +21,21 @@ test "Successfully extracts bytes" {
     try expect(getByte(0x00FF, 1) == 0xFF);
 }
 
-pub const cpu = struct {
+pub const CPU = struct {
     registers: [8]u32 = std.mem.zeroes([8]u32),
 
-    pub fn execute(self: *cpu, instruction: u32) void {
-        // TODO: carry flags
+    const StatusRegister: u3 = 4;
+    const StackPointer: u3 = 5;
+    const LinkRegister: u3 = 6;
+    const ProgramCounter: u3 = 7;
+
+    const EqualMask: u32 = 0b10000000000000000000000000000000;
+    const NegativeMask: u32 = 0b01000000000000000000000000000000;
+    // TODO: should be public?
+    pub const CarryMask: u32 = 0b00100000000000000000000000000000;
+    pub const OverflowMask: u32 = 0b00010000000000000000000000000000;
+
+    pub fn execute(self: *CPU, instruction: u16) void {
         const startNibble: u4 = getNibble(instruction, 0);
         switch (startNibble) {
             0b0000...0b1101 => {
@@ -107,98 +117,125 @@ pub const cpu = struct {
             },
         }
     }
+    const ArithmeticOperation = enum { plus, minus };
+    const ArithmeticResult = struct { result: u32, carry: bool, overflow: bool };
 
-    // TODO: write overflow status to register
-    fn addConstantOp(self: *cpu, rx: u3, constant: u8) void {
-        var result: u32 = undefined;
-        const overflowed: bool = @addWithOverflow(u32, self.registers[rx], constant, &result);
-        _ = overflowed;
-        self.registers[rx] = result;
-    }
-    fn addOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
-        var result: u32 = undefined;
-        const overflowed: bool = @addWithOverflow(u32, self.registers[ry], self.registers[rz], &result);
-        _ = overflowed;
-        self.registers[rx] = result;
-    }
-    fn subtractConstantOp(self: *cpu, rx: u3, constant: u8) void {
-        var result: u32 = undefined;
-        const overflowed: bool = @subWithOverflow(u32, self.registers[rx], constant, &result);
-        _ = overflowed;
-        self.registers[rx] = result;
-    }
-    fn subtractOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
-        var result: u32 = undefined;
-        const overflowed: bool = @subWithOverflow(u32, self.registers[ry], self.registers[rz], &result);
-        _ = overflowed;
-        self.registers[rx] = result;
+    fn calculateArithmeticResult(a: u32, operation: ArithmeticOperation, b: u32) ArithmeticResult {
+        var arithmeticResult = ArithmeticResult{
+            .result = undefined,
+            .carry = undefined,
+            .overflow = undefined,
+        };
+
+        arithmeticResult.carry = switch (operation) {
+            ArithmeticOperation.plus => @addWithOverflow(u32, a, b, &arithmeticResult.result),
+            ArithmeticOperation.minus => @subWithOverflow(u32, a, b, &arithmeticResult.result),
+        };
+
+        const signBitA: u1 = @intCast(u1, a >> 31);
+        const signBitB: u1 = @intCast(u1, b >> 31);
+        const signBitResult: u1 = @intCast(u1, arithmeticResult.result >> 31);
+
+        arithmeticResult.overflow = switch (operation) {
+            // Two inputs with same sign resulting in different sign then the overflow flag should be set
+            // (~(a ^ b) & (a ^ result)) >> 31 != 0;
+            ArithmeticOperation.plus => (signBitA == signBitB) and (signBitA != signBitResult),
+            // Two inputs with different sign resulting in same sign as b then the overflow flag should be set
+            // ((a ^ b) & ~(b ^ result)) >> 31 != 0;
+            ArithmeticOperation.minus => (signBitA != signBitB) and (signBitB == signBitResult),
+        };
+
+        return arithmeticResult;
     }
 
-    fn writeConstantOp(self: *cpu, rx: u3, constant: u8) void {
+    fn storeArithmeticResult(self: *CPU, register: u3, arithmeticResult: ArithmeticResult) void {
+        self.registers[register] = arithmeticResult.result;
+
+        self.registers[StatusRegister] &= ~CarryMask;
+        self.registers[StatusRegister] &= ~OverflowMask;
+
+        if (arithmeticResult.carry) {
+            self.registers[StatusRegister] |= CarryMask;
+        }
+
+        if (arithmeticResult.overflow) {
+            self.registers[StatusRegister] |= OverflowMask;
+        }
+    }
+
+    fn addConstantOp(self: *CPU, rx: u3, constant: u8) void {
+        const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.plus, constant);
+        self.storeArithmeticResult(rx, result);
+    }
+    fn addOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+        const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.plus, self.registers[rz]);
+        self.storeArithmeticResult(rx, result);
+    }
+    fn subtractConstantOp(self: *CPU, rx: u3, constant: u8) void {
+        const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, constant);
+        self.storeArithmeticResult(rx, result);
+    }
+    fn subtractOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+        const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.minus, self.registers[rz]);
+        self.storeArithmeticResult(rx, result);
+    }
+
+    fn writeConstantOp(self: *CPU, rx: u3, constant: u8) void {
         self.registers[rx] = constant;
     }
 
-    fn shiftRightOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
+    fn shiftRightOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         _ = rz;
         _ = ry;
         _ = rx;
         _ = self;
+        // self.registers[rx] = self.registers[ry] >> self.registers[rz];
     }
-    fn shiftLeftOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
+    fn shiftLeftOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         _ = rz;
         _ = ry;
         _ = rx;
         _ = self;
+        // self.registers[rx] = self.registers[ry] << self.registers[rz];
     }
-    fn orOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
-        _ = rz;
-        _ = ry;
-        _ = rx;
-        _ = self;
+    fn orOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+        self.registers[rx] = self.registers[ry] | self.registers[rz];
     }
-    fn andOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
-        _ = rz;
-        _ = ry;
-        _ = rx;
-        _ = self;
+    fn andOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+        self.registers[rx] = self.registers[ry] & self.registers[rz];
     }
-    fn flipOp(self: *cpu, rx: u3, ry: u3) void {
-        _ = ry;
-        _ = rx;
-        _ = self;
+    fn flipOp(self: *CPU, rx: u3, ry: u3) void {
+        self.registers[rx] = ~self.registers[ry];
     }
-    fn xorOp(self: *cpu, rx: u3, ry: u3, rz: u3) void {
-        _ = rz;
-        _ = ry;
-        _ = rx;
-        _ = self;
+    fn xorOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+        self.registers[rx] = self.registers[ry] ^ self.registers[rz];
     }
 
-    fn copyRegisterOp(self: *cpu, rx: u3, ry: u3) void {
+    fn copyRegisterOp(self: *CPU, rx: u3, ry: u3) void {
         self.registers[rx] = self.registers[ry];
     }
-    fn copyFromAddressOp(self: *cpu, rx: u3, ry: u3) void {
+    fn copyFromAddressOp(self: *CPU, rx: u3, ry: u3) void {
         _ = ry;
         _ = rx;
         _ = self;
     }
-    fn copyToAddressOp(self: *cpu, rx: u3, ry: u3) void {
-        _ = ry;
-        _ = rx;
-        _ = self;
-    }
-
-    fn compareOp(self: *cpu, rx: u3, ry: u3) void {
+    fn copyToAddressOp(self: *CPU, rx: u3, ry: u3) void {
         _ = ry;
         _ = rx;
         _ = self;
     }
 
-    fn pushOp(self: *cpu, rx: u3) void {
+    fn compareOp(self: *CPU, rx: u3, ry: u3) void {
+        _ = ry;
         _ = rx;
         _ = self;
     }
-    fn popOp(self: *cpu, rx: u3) void {
+
+    fn pushOp(self: *CPU, rx: u3) void {
+        _ = rx;
+        _ = self;
+    }
+    fn popOp(self: *CPU, rx: u3) void {
         _ = rx;
         _ = self;
     }
