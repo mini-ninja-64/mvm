@@ -4,13 +4,13 @@ const testing = @import("std").testing;
 const cpu = @import("cpu.zig");
 
 fn generate3RegisterInstruction(opcode: u4, rx: u4, ry: u4, rz: u4) u16 {
-    return @intCast(u16, opcode) << 12 | @intCast(u16, rx) << 8 | @intCast(u16, ry) << 4 | rz;
+    return @as(u16, opcode) << 12 | @as(u16, rx) << 8 | @as(u16, ry) << 4 | rz;
 }
 fn generate1RegisterConstantInstruction(opcode: u4, rx: u4, constant: u8) u16 {
-    return @intCast(u16, opcode) << 12 | @intCast(u16, rx) << 8 | constant;
+    return @as(u16, opcode) << 12 | @as(u16, rx) << 8 | constant;
 }
 fn generate2RegisterInstruction(opcode: u8, rx: u4, ry: u4) u16 {
-    return @intCast(u16, opcode) << 8 | @intCast(u16, rx) << 4 | ry;
+    return @as(u16, opcode) << 8 | @as(u16, rx) << 4 | ry;
 }
 
 fn carried(register: u32) bool {
@@ -73,8 +73,8 @@ test "Updates overflow and carry flags on arithmetic operations" {
     const MAX: u32 = 0xFFFFFFFF;
     const MAX_SIGNED: u32 = 0x7FFFFFFF;
     const MIN_SIGNED: u32 = 0x80000000;
-    const POSITIVE_1: u32 = @intCast(u32, 1);
-    const NEGATIVE_1: u32 = @bitCast(u32, @intCast(i32, -1));
+    const POSITIVE_1: u32 = @as(u32, @intCast(1));
+    const NEGATIVE_1: u32 = @as(u32, @bitCast(@as(i32, @intCast(-1))));
     const ZERO: u32 = 0;
 
     // MAX + 1 = 0 or -1 + 1 = 0 (carry)

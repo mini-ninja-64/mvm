@@ -2,7 +2,7 @@ const std = @import("std");
 const expect = @import("std").testing.expect;
 
 fn getNibble(instruction: u32, nibbleIndex: u2) u4 {
-    return @intCast(u4, (instruction >> (@intCast(u5, 3 - nibbleIndex) * 4)) & 0b1111);
+    return @as(u4, @intCast((instruction >> (@as(u5, @intCast(3 - nibbleIndex)) * 4)) & 0b1111));
 }
 
 test "Successfully extracts nibbles" {
@@ -13,7 +13,7 @@ test "Successfully extracts nibbles" {
 }
 
 fn getByte(instruction: u32, byteIndex: u1) u8 {
-    return @intCast(u8, (instruction >> (@intCast(u5, 1 - byteIndex) * 8)) & 0xFF);
+    return @intCast((instruction >> (@as(u5, 1 - byteIndex) * 8)) & 0xFF);
 }
 
 test "Successfully extracts bytes" {
@@ -42,9 +42,9 @@ pub const CPU = struct {
                 // 4 bit ops
                 const opCode = startNibble;
                 // TODO: should probably safety check instead of truncating
-                const rx = @truncate(u3, getNibble(instruction, 1));
-                const ry = @truncate(u3, getNibble(instruction, 2));
-                const rz = @truncate(u3, getNibble(instruction, 3));
+                const rx = @as(u3, @truncate(getNibble(instruction, 1)));
+                const ry = @as(u3, @truncate(getNibble(instruction, 2)));
+                const rz = @as(u3, @truncate(getNibble(instruction, 3)));
                 const constant = getByte(instruction, 1);
 
                 switch (opCode) {
@@ -69,8 +69,8 @@ pub const CPU = struct {
             0b1110 => {
                 // 8 bit ops
                 const lowerOpCode: u4 = getNibble(instruction, 1);
-                const rx = @truncate(u3, getNibble(instruction, 2));
-                const ry = @truncate(u3, getNibble(instruction, 3));
+                const rx = @as(u3, @truncate(getNibble(instruction, 2)));
+                const ry = @as(u3, @truncate(getNibble(instruction, 3)));
 
                 switch (lowerOpCode) {
                     0 => self.copyRegisterOp(rx, ry),
@@ -87,7 +87,7 @@ pub const CPU = struct {
 
             0b1111 => {
                 // 14 bit ops
-                const lowerOpCode: u6 = @intCast(u6, (instruction >> 10) & 0b111111);
+                const lowerOpCode: u6 = @as(u6, @intCast((instruction >> 10) & 0b111111));
                 switch (lowerOpCode) {
                     0 => {}, // Branch always
                     1 => {}, // BranchEqual
@@ -127,14 +127,16 @@ pub const CPU = struct {
             .overflow = undefined,
         };
 
-        arithmeticResult.carry = switch (operation) {
-            ArithmeticOperation.plus => @addWithOverflow(u32, a, b, &arithmeticResult.result),
-            ArithmeticOperation.minus => @subWithOverflow(u32, a, b, &arithmeticResult.result),
+        var overflowResult = switch (operation) {
+            ArithmeticOperation.plus => @addWithOverflow(a, b),
+            ArithmeticOperation.minus => @subWithOverflow(a, b),
         };
+        arithmeticResult.result = overflowResult[0];
+        arithmeticResult.carry = overflowResult[1] == 1;
 
-        const signBitA: u1 = @intCast(u1, a >> 31);
-        const signBitB: u1 = @intCast(u1, b >> 31);
-        const signBitResult: u1 = @intCast(u1, arithmeticResult.result >> 31);
+        const signBitA: u1 = @as(u1, @intCast(a >> 31));
+        const signBitB: u1 = @as(u1, @intCast(b >> 31));
+        const signBitResult: u1 = @as(u1, @intCast(arithmeticResult.result >> 31));
 
         arithmeticResult.overflow = switch (operation) {
             // Two inputs with same sign resulting in different sign then the overflow flag should be set
