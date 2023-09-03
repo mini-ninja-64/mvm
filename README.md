@@ -28,8 +28,8 @@ Registers 8 onwards may be available for hardware peripherals such as serial.
 |            |                                               |                |                                  |                |
 | 4          | WriteConstant(Rx, Constant)                   | 0b0100         | OPCODE[4] Rx[4] Constant[8]      | Rx = Constant  |
 |            |                                               |                |                                  |                |
-| 5          | ShiftRight(Rx, Ry, Rz)                        | 0b0101         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx  = Ry >> Rz |
-| 6          | ShiftLeft(Rx, Ry, Rz)                         | 0b0110         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx  = Ry << Rz |
+| 5          | ShiftLeft(Rx, Ry, Rz)                         | 0b0101         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx  = Ry << Rz |
+| 6          | ShiftRight(Rx, Ry, Rz)                        | 0b0110         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx  = Ry >> Rz |
 | 7          | Or(Rx, Ry, Rz)                                | 0b0111         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx  = Ry \| Rz |
 | 8          | And(Rx, Ry, Rz)                               | 0b1000         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx = Ry & Rz   |
 | 9          | Flip(Rx, Ry)                                  | 0b1001         | OPCODE[4] Rx[4] Ry[4] _[4]       | Rx = ~Ry       |

@@ -54,6 +54,13 @@ test "Subtracts constants" {
 
     mvmCpu.execute(instruction);
     try testing.expectEqual(@as(u32, 100 - 9), mvmCpu.registers[register]);
+
+    // Test 2's complement behaviour
+    mvmCpu.registers[register] = 5;
+    const instruction2 = generate1RegisterConstantInstruction(0b0010, register, 25);
+    mvmCpu.execute(instruction2);
+    const expected: u32 = @bitCast(@as(i32, 5 -% 25));
+    try testing.expectEqual(expected, mvmCpu.registers[register]);
 }
 
 test "Subtracts registers" {
@@ -148,6 +155,24 @@ test "Writes constants to registers" {
     try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[0]);
 }
 
+test "Bitwise left shift correctly shifts a register" {
+    var mvmCpu = cpu.CPU{};
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[1] = 8;
+    mvmCpu.execute(generate3RegisterInstruction(0b0101, 0, 0, 1));
+    try testing.expectEqual(@as(u32, 0xBBCCDD00), mvmCpu.registers[0]);
+}
+
+test "Bitwise right shift correctly shifts a register" {
+    var mvmCpu = cpu.CPU{};
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[1] = 8;
+    mvmCpu.execute(generate3RegisterInstruction(0b0110, 0, 0, 1));
+    try testing.expectEqual(@as(u32, 0x00AABBCC), mvmCpu.registers[0]);
+}
+
 test "Bitwise or correctly or's registers" {
     var mvmCpu = cpu.CPU{};
 
@@ -192,3 +217,25 @@ test "Copies registers correctly" {
     mvmCpu.execute(generate2RegisterInstruction(0b11100000, 0, 1));
     try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[0]);
 }
+
+test "Copies data from memory address to register" {
+    // TODO
+}
+
+test "Copies data from register to memory address" {
+    // TODO
+}
+
+test "Compares provided registers" {
+    // TODO
+}
+
+test "Push should add the current register to the stack" {
+    // TODO
+}
+
+test "Pop should remove 32-bits from the stack and store it in the provided register" {
+    // TODO
+}
+
+// TODO: branching tests

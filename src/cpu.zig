@@ -56,8 +56,8 @@ pub const CPU = struct {
 
                     4 => self.writeConstantOp(rx, constant),
 
-                    5 => self.shiftRightOp(rx, ry, rz),
-                    6 => self.shiftLeftOp(rx, ry, rz),
+                    5 => self.shiftLeftOp(rx, ry, rz),
+                    6 => self.shiftRightOp(rx, ry, rz),
                     7 => self.orOp(rx, ry, rz),
                     8 => self.andOp(rx, ry, rz),
                     9 => self.flipOp(rx, ry),
@@ -187,18 +187,10 @@ pub const CPU = struct {
     }
 
     fn shiftRightOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
-        _ = rz;
-        _ = ry;
-        _ = rx;
-        _ = self;
-        // self.registers[rx] = self.registers[ry] >> self.registers[rz];
+        self.registers[rx] = self.registers[ry] >> @truncate(self.registers[rz]);
     }
     fn shiftLeftOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
-        _ = rz;
-        _ = ry;
-        _ = rx;
-        _ = self;
-        // self.registers[rx] = self.registers[ry] << self.registers[rz];
+        self.registers[rx] = self.registers[ry] << @truncate(self.registers[rz]);
     }
     fn orOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         self.registers[rx] = self.registers[ry] | self.registers[rz];
