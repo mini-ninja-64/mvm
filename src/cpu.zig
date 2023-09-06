@@ -22,6 +22,7 @@ test "Successfully extracts bytes" {
 }
 
 pub const CPU = struct {
+    memory: []u8,
     registers: [8]u32 = std.mem.zeroes([8]u32),
 
     const StatusRegister: u3 = 4;
@@ -209,14 +210,19 @@ pub const CPU = struct {
         self.registers[rx] = self.registers[ry];
     }
     fn copyFromAddressOp(self: *CPU, rx: u3, ry: u3) void {
-        _ = ry;
-        _ = rx;
-        _ = self;
+        const memoryAddress = self.registers[ry];
+        self.registers[rx] =
+            @as(u32, self.memory[memoryAddress + 0]) << 24 |
+            @as(u32, self.memory[memoryAddress + 1]) << 16 |
+            @as(u32, self.memory[memoryAddress + 2]) << 8 |
+            @as(u32, self.memory[memoryAddress + 3]) << 0;
     }
     fn copyToAddressOp(self: *CPU, rx: u3, ry: u3) void {
-        _ = ry;
-        _ = rx;
-        _ = self;
+        const memoryAddress = self.registers[ry];
+        self.memory[memoryAddress + 0] = @as(u8, @truncate(self.registers[rx] >> 24));
+        self.memory[memoryAddress + 1] = @as(u8, @truncate(self.registers[rx] >> 16));
+        self.memory[memoryAddress + 2] = @as(u8, @truncate(self.registers[rx] >> 8));
+        self.memory[memoryAddress + 3] = @as(u8, @truncate(self.registers[rx] >> 0));
     }
 
     fn compareOp(self: *CPU, rx: u3, ry: u3) void {

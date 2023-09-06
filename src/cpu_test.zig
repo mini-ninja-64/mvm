@@ -3,6 +3,8 @@ const testing = @import("std").testing;
 
 const cpu = @import("cpu.zig");
 
+const ZERO_MEMORY = [_]u8{};
+
 fn generate3RegisterInstruction(opcode: u4, rx: u4, ry: u4, rz: u4) u16 {
     return @as(u16, opcode) << 12 | @as(u16, rx) << 8 | @as(u16, ry) << 4 | rz;
 }
@@ -22,7 +24,7 @@ fn overflowed(register: u32) bool {
 }
 
 test "Adds constants" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     const register = 0;
     mvmCpu.registers[register] = 100;
@@ -34,7 +36,8 @@ test "Adds constants" {
 }
 
 test "Adds registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
     mvmCpu.registers[1] = 40;
     mvmCpu.registers[2] = 15;
 
@@ -45,7 +48,7 @@ test "Adds registers" {
 }
 
 test "Subtracts constants" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     const register = 0;
     mvmCpu.registers[register] = 100;
@@ -64,7 +67,8 @@ test "Subtracts constants" {
 }
 
 test "Subtracts registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
     mvmCpu.registers[1] = 40;
     mvmCpu.registers[2] = 15;
 
@@ -75,7 +79,7 @@ test "Subtracts registers" {
 }
 
 test "Updates overflow and carry flags on arithmetic operations" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     const MAX: u32 = 0xFFFFFFFF;
     const MAX_SIGNED: u32 = 0x7FFFFFFF;
@@ -132,7 +136,7 @@ test "Updates overflow and carry flags on arithmetic operations" {
 }
 
 test "Resets overflow and carry flags on arithmetic operations" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0x7FFFFFFF;
     mvmCpu.registers[1] = 0xFFFFFFFF;
@@ -147,7 +151,7 @@ test "Resets overflow and carry flags on arithmetic operations" {
 }
 
 test "Writes constants to registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     const instruction = generate1RegisterConstantInstruction(0b0100, 0, 0xFF);
     mvmCpu.execute(instruction);
@@ -156,7 +160,7 @@ test "Writes constants to registers" {
 }
 
 test "Bitwise left shift correctly shifts a register" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 8;
@@ -165,7 +169,7 @@ test "Bitwise left shift correctly shifts a register" {
 }
 
 test "Bitwise right shift correctly shifts a register" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 8;
@@ -174,7 +178,7 @@ test "Bitwise right shift correctly shifts a register" {
 }
 
 test "Bitwise or correctly or's registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 0xDDCCBBAA;
@@ -183,7 +187,7 @@ test "Bitwise or correctly or's registers" {
 }
 
 test "Bitwise and correctly and's registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 0xDDCCBBAA;
@@ -192,7 +196,7 @@ test "Bitwise and correctly and's registers" {
 }
 
 test "Bitwise flip correctly flips a register" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCFF;
     mvmCpu.execute(generate3RegisterInstruction(0b1001, 1, 0, 0));
@@ -200,7 +204,7 @@ test "Bitwise flip correctly flips a register" {
 }
 
 test "Bitwise xor correctly xor's registers" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0xAABBCCF0;
     mvmCpu.registers[1] = 0xDDCCBBFF;
@@ -209,7 +213,7 @@ test "Bitwise xor correctly xor's registers" {
 }
 
 test "Copies registers correctly" {
-    var mvmCpu = cpu.CPU{};
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0;
     mvmCpu.registers[1] = 0xAABBCCDD;
@@ -218,12 +222,34 @@ test "Copies registers correctly" {
     try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[0]);
 }
 
+// TODO: Define behaviour if memory not big enough etc
 test "Copies data from memory address to register" {
-    // TODO
+    var memory = [_]u8{ 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0xAA, 0xBB };
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0;
+    mvmCpu.registers[1] = 4;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100001, 0, 1));
+    try testing.expectEqual(@as(u32, 0xEEFFAABB), mvmCpu.registers[0]);
 }
 
 test "Copies data from register to memory address" {
-    // TODO
+    var memory = [_]u8{0} ** 8;
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[1] = 2;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100010, 0, 1));
+    try testing.expectEqual(@as(u8, 0x00), memory[0]);
+    try testing.expectEqual(@as(u8, 0x00), memory[1]);
+    try testing.expectEqual(@as(u8, 0xAA), memory[2]);
+    try testing.expectEqual(@as(u8, 0xBB), memory[3]);
+    try testing.expectEqual(@as(u8, 0xCC), memory[4]);
+    try testing.expectEqual(@as(u8, 0xDD), memory[5]);
+    try testing.expectEqual(@as(u8, 0x00), memory[6]);
+    try testing.expectEqual(@as(u8, 0x00), memory[7]);
 }
 
 test "Compares provided registers" {
