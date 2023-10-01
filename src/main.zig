@@ -1,18 +1,18 @@
 const std = @import("std");
-const cpu = @import("cpu.zig").cpu;
+const cpu = @import("cpu.zig").CPU;
 
-const ADD_CONSTANT: u32 = 0b0000000000000000;
-const ADD: u32 = 0b0001000000000000;
-const SUBTRACT_CONSTANT: u32 = 0b0010000000000000;
-const SUBTRACT: u32 = 0b0011000000000000;
-const WRITE_CONSTANT: u32 = 0b0100000000000000;
-const COPY_REGISTER: u32 = 0b1110000000000000;
+const ADD_CONSTANT: u16 = 0b0000000000000000;
+const ADD: u16 = 0b0001000000000000;
+const SUBTRACT_CONSTANT: u16 = 0b0010000000000000;
+const SUBTRACT: u16 = 0b0011000000000000;
+const WRITE_CONSTANT: u16 = 0b0100000000000000;
+const COPY_REGISTER: u16 = 0b1110000000000000;
 
-pub fn registerAsArgument(register: u4, argumentIndex: u4) u32 {
-    return @intCast(u32, register) << (2 - argumentIndex) * 4;
+pub fn registerAsArgument(register: u4, argumentIndex: u4) u16 {
+    return @as(u16, register) << (2 - argumentIndex) * 4;
 }
 
-pub fn constantAsArgument(constant: u8) u32 {
+pub fn constantAsArgument(constant: u8) u16 {
     return constant;
 }
 
