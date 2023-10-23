@@ -256,12 +256,4 @@ test "Compares provided registers" {
     // TODO
 }
 
-test "Push should add the current register to the stack" {
-    // TODO
-}
-
-test "Pop should remove 32-bits from the stack and store it in the provided register" {
-    // TODO
-}
-
 // TODO: branching tests

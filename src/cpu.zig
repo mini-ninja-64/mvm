@@ -78,10 +78,8 @@ pub const CPU = struct {
                     1 => self.copyFromAddressOp(rx, ry),
                     2 => self.copyToAddressOp(rx, ry),
 
-                    3 => self.compareOp(rx, ry),
+                    7 => self.compareOp(rx, ry),
 
-                    4 => self.pushOp(rx),
-                    5 => self.popOp(rx),
                     else => std.debug.print("Error unknown instruction: '{}'", .{instruction}),
                 }
             },
@@ -151,9 +149,7 @@ pub const CPU = struct {
         return arithmeticResult;
     }
 
-    fn storeArithmeticResult(self: *CPU, register: u3, arithmeticResult: ArithmeticResult) void {
-        self.registers[register] = arithmeticResult.result;
-
+    fn storeArithmeticStatus(self: *CPU, arithmeticResult: ArithmeticResult) void {
         self.registers[StatusRegister] &= ~CarryMask;
         self.registers[StatusRegister] &= ~OverflowMask;
 
@@ -168,7 +164,8 @@ pub const CPU = struct {
 
     fn addConstantOp(self: *CPU, rx: u3, constant: u8) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.plus, constant);
-        self.storeArithmeticResult(rx, result);
+        self.storeArithmeticStatus(result);
+        self.registers[rx] = result.result;
     }
     fn addOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.plus, self.registers[rz]);
@@ -180,7 +177,8 @@ pub const CPU = struct {
     }
     fn subtractOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.minus, self.registers[rz]);
-        self.storeArithmeticResult(rx, result);
+        self.storeArithmeticStatus(result);
+        self.registers[rx] = result.result;
     }
 
     fn writeConstantOp(self: *CPU, rx: u3, constant: u8) void {
@@ -226,17 +224,7 @@ pub const CPU = struct {
     }
 
     fn compareOp(self: *CPU, rx: u3, ry: u3) void {
-        _ = ry;
-        _ = rx;
-        _ = self;
-    }
-
-    fn pushOp(self: *CPU, rx: u3) void {
-        _ = rx;
-        _ = self;
-    }
-    fn popOp(self: *CPU, rx: u3) void {
-        _ = rx;
-        _ = self;
+        const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, self.registers[ry]);
+        self.storeArithmeticStatus(result);
     }
 };
