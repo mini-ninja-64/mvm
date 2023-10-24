@@ -242,14 +242,51 @@ test "Copies data from register to memory address" {
     mvmCpu.registers[1] = 2;
 
     mvmCpu.execute(generate2RegisterInstruction(0b11100010, 0, 1));
-    try testing.expectEqual(@as(u8, 0x00), memory[0]);
-    try testing.expectEqual(@as(u8, 0x00), memory[1]);
-    try testing.expectEqual(@as(u8, 0xAA), memory[2]);
-    try testing.expectEqual(@as(u8, 0xBB), memory[3]);
-    try testing.expectEqual(@as(u8, 0xCC), memory[4]);
-    try testing.expectEqual(@as(u8, 0xDD), memory[5]);
-    try testing.expectEqual(@as(u8, 0x00), memory[6]);
-    try testing.expectEqual(@as(u8, 0x00), memory[7]);
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x00 }, memory[0..8]);
+}
+
+test "Copies half word from memory address to register" {
+    var memory = [_]u8{ 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0xAA, 0xBB };
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0;
+    mvmCpu.registers[1] = 1;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100011, 0, 1));
+    try testing.expectEqual(@as(u32, 0xBBCC), mvmCpu.registers[0]);
+}
+
+test "Copies half word from register to memory address" {
+    var memory = [_]u8{0} ** 8;
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[1] = 2;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100100, 0, 1));
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xCC, 0xDD, 0x00, 0x00, 0x00, 0x00 }, memory[0..8]);
+}
+
+test "Copies byte from memory address to register" {
+    var memory = [_]u8{ 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0xAA, 0xBB };
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0;
+    mvmCpu.registers[1] = 5;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100101, 0, 1));
+    try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[0]);
+}
+
+test "Copies byte from register to memory address" {
+    var memory = [_]u8{0} ** 8;
+    var mvmCpu = cpu.CPU{ .memory = &memory };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[1] = 2;
+
+    mvmCpu.execute(generate2RegisterInstruction(0b11100110, 0, 1));
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xDD, 0x00, 0x00, 0x00, 0x00, 0x00 }, memory[0..8]);
 }
 
 test "Compares provided registers" {

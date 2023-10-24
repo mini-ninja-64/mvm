@@ -75,9 +75,12 @@ pub const CPU = struct {
 
                 switch (lowerOpCode) {
                     0 => self.copyRegisterOp(rx, ry),
-                    1 => self.copyFromAddressOp(rx, ry),
-                    2 => self.copyToAddressOp(rx, ry),
-
+                    1 => self.copyFromAddress(rx, ry, 4),
+                    2 => self.copyToAddress(rx, ry, 4),
+                    3 => self.copyFromAddress(rx, ry, 2),
+                    4 => self.copyToAddress(rx, ry, 2),
+                    5 => self.copyFromAddress(rx, ry, 1),
+                    6 => self.copyToAddress(rx, ry, 1),
                     7 => self.compareOp(rx, ry),
 
                     else => std.debug.print("Error unknown instruction: '{}'", .{instruction}),
@@ -169,11 +172,13 @@ pub const CPU = struct {
     }
     fn addOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.plus, self.registers[rz]);
-        self.storeArithmeticResult(rx, result);
+        self.storeArithmeticStatus(result);
+        self.registers[rx] = result.result;
     }
     fn subtractConstantOp(self: *CPU, rx: u3, constant: u8) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, constant);
-        self.storeArithmeticResult(rx, result);
+        self.storeArithmeticStatus(result);
+        self.registers[rx] = result.result;
     }
     fn subtractOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.minus, self.registers[rz]);
@@ -207,20 +212,25 @@ pub const CPU = struct {
     fn copyRegisterOp(self: *CPU, rx: u3, ry: u3) void {
         self.registers[rx] = self.registers[ry];
     }
-    fn copyFromAddressOp(self: *CPU, rx: u3, ry: u3) void {
+    fn copyFromAddress(self: *CPU, rx: u3, ry: u3, comptime length: usize) void {
+        comptime {
+            try std.testing.expect(length <= 4);
+        }
         const memoryAddress = self.registers[ry];
-        self.registers[rx] =
-            @as(u32, self.memory[memoryAddress + 0]) << 24 |
-            @as(u32, self.memory[memoryAddress + 1]) << 16 |
-            @as(u32, self.memory[memoryAddress + 2]) << 8 |
-            @as(u32, self.memory[memoryAddress + 3]) << 0;
+        for (0..length) |i| {
+            var shiftLength = @as(u5, @truncate(((length - 1) - i) * 8));
+            self.registers[rx] |= @as(u32, self.memory[memoryAddress + i]) << shiftLength;
+        }
     }
-    fn copyToAddressOp(self: *CPU, rx: u3, ry: u3) void {
+    fn copyToAddress(self: *CPU, rx: u3, ry: u3, comptime length: usize) void {
+        comptime {
+            try std.testing.expect(length <= 4);
+        }
         const memoryAddress = self.registers[ry];
-        self.memory[memoryAddress + 0] = @as(u8, @truncate(self.registers[rx] >> 24));
-        self.memory[memoryAddress + 1] = @as(u8, @truncate(self.registers[rx] >> 16));
-        self.memory[memoryAddress + 2] = @as(u8, @truncate(self.registers[rx] >> 8));
-        self.memory[memoryAddress + 3] = @as(u8, @truncate(self.registers[rx] >> 0));
+        for (0..length) |i| {
+            var shiftLength = @as(u5, @truncate(((length - 1) - i) * 8));
+            self.memory[memoryAddress + i] = @as(u8, @truncate(self.registers[rx] >> shiftLength));
+        }
     }
 
     fn compareOp(self: *CPU, rx: u3, ry: u3) void {
