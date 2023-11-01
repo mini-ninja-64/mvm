@@ -46,30 +46,16 @@ Registers 8 onwards may be available for hardware peripherals such as serial.
 |            |                                               |                |                                  |                     |
 | 18         | Compare(Rx, Ry)                               | 0b1110 0111    | OPCODE[8] Rx[4] Ry[4]            | Rx - Ry             |
 |            |                                               |                |                                  |                     |
-| 14 bit ops |                                               |                |                                  |                     |
-| 19         | BranchAlways(BranchConfig, Rx)                | 0b1111 00 0000 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 20         | BranchEqual(BranchConfig, Rx)                 | 0b1111 00 0001 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 21         | BranchNotEqual(BranchConfig, Rx)              | 0b1111 00 0010 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
+| 10 bit ops |                                               |                |                                  |                     |
+| 19         | BranchAlways(BranchConfig, Rx)                | 0b1111 00 0000 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 20         | BranchEqual(BranchConfig, Rx)                 | 0b1111 00 0001 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 21         | BranchNotEqual(BranchConfig, Rx)              | 0b1111 00 0010 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 |            |                                               |                |                                  |                     |
-| 22         | BranchMoreThanUnsigned(BranchConfig, Rx)      | 0b1111 00 0011 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 23         | BranchMoreThanSigned(BranchConfig, Rx)        | 0b1111 00 0100 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 24         | BranchMoreThanEqualUnsigned(BranchConfig, Rx) | 0b1111 00 0101 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 25         | BranchMoreThanEqualSigned(BranchConfig, Rx)   | 0b1111 00 0110 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
+| 22         | BranchGreaterThan(BranchConfig, Rx)           | 0b1111 00 0011 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 23         | BranchGreaterThanEqual(BranchConfig, Rx)      | 0b1111 00 0100 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 |            |                                               |                |                                  |                     |
-| 26         | BranchLessThanUnsigned(BranchConfig, Rx)      | 0b1111 00 0111 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 27         | BranchLessThanSigned(BranchConfig, Rx)        | 0b1111 00 1000 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 28         | BranchLessThanEqualUnsigned(BranchConfig, Rx) | 0b1111 00 1001 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 29         | BranchLessThanEqualSigned(BranchConfig, Rx)   | 0b1111 00 1010 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-|            |                                               |                |                                  |                     |
-| 30         | BranchLessThanUnsigned(BranchConfig, Rx)      | 0b1111 00 1011 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 31         | BranchLessThanSigned(BranchConfig, Rx)        | 0b1111 00 1100 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 32         | BranchLessThanEqualUnsigned(BranchConfig, Rx) | 0b1111 00 1101 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 33         | BranchLessThanEqualSigned(BranchConfig, Rx)   | 0b1111 00 1110 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-|            |                                               |                |                                  |                     |
-| 34         | BranchLessThanUnsigned(BranchConfig, Rx)      | 0b1111 00 1111 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 35         | BranchLessThanSigned(BranchConfig, Rx)        | 0b1111 01 0000 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 36         | BranchLessThanEqualUnsigned(BranchConfig, Rx) | 0b1111 01 0001 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
-| 37         | BranchLessThanEqualSigned(BranchConfig, Rx)   | 0b1111 01 0010 | OPCODE[14] BranchConfig[2] Rx[4] |                     |
+| 24         | BranchLessThan(BranchConfig, Rx)              | 0b1111 00 0101 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 25         | BranchLessThanEqual(BranchConfig, Rx)         | 0b1111 00 0110 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 
 ### Args
 

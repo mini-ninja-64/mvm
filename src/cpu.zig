@@ -25,19 +25,20 @@ pub const CPU = struct {
     memory: []u8,
     registers: [8]u32 = std.mem.zeroes([8]u32),
 
-    const StatusRegister: u3 = 4;
-    const StackPointer: u3 = 5;
-    const LinkRegister: u3 = 6;
-    const ProgramCounter: u3 = 7;
+    pub const StatusRegister: u3 = 4;
+    pub const StackPointer: u3 = 5;
+    pub const LinkRegister: u3 = 6;
+    pub const ProgramCounter: u3 = 7;
 
-    const EqualMask: u32 = 0b10000000000000000000000000000000;
-    const NegativeMask: u32 = 0b01000000000000000000000000000000;
     // TODO: should be public?
+    pub const ZeroMask: u32 = 0b10000000000000000000000000000000;
+    pub const NegativeMask: u32 = 0b01000000000000000000000000000000;
     pub const CarryMask: u32 = 0b00100000000000000000000000000000;
     pub const OverflowMask: u32 = 0b00010000000000000000000000000000;
 
     pub fn execute(self: *CPU, instruction: u16) void {
         const startNibble: u4 = getNibble(instruction, 0);
+
         switch (startNibble) {
             0b0000...0b1101 => {
                 // 4 bit ops
@@ -88,32 +89,24 @@ pub const CPU = struct {
             },
 
             0b1111 => {
-                // 14 bit ops
-                const lowerOpCode: u6 = @as(u6, @intCast((instruction >> 10) & 0b111111));
+                // 10 bit ops
+                const branchConfigBits = @as(u2, @intCast((instruction >> 4) & 0b11));
+                const branchConfig: BranchConfig = .{ .updateLinkRegister = (branchConfigBits | 0b01) == 1 };
+                const rx: u3 = @as(u3, @truncate(getNibble(instruction, 3)));
+
+                const lowerOpCode: u6 = @as(u6, @intCast((instruction >> 6) & 0b111111));
+                const status = self.getStatus();
                 switch (lowerOpCode) {
-                    0 => {}, // Branch always
-                    1 => {}, // BranchEqual
-                    2 => {}, // BranchNotEqual
+                    0 => self.handleBranch(branchConfig, rx, true), // Branch always
+                    1 => self.handleBranch(branchConfig, rx, status.zero), // BranchEqual
+                    2 => self.handleBranch(branchConfig, rx, !status.zero), // BranchNotEqual
 
-                    3 => {}, // BranchMoreThanUnsigned
-                    4 => {}, // BranchMoreThanSigned
-                    5 => {}, // BranchMoreThanEqualUnsigned
-                    6 => {}, // BranchMoreThanEqualSigned
+                    3 => self.handleBranch(branchConfig, rx, !status.zero and (status.negative == status.overflow)), // BranchGreaterThan
+                    4 => self.handleBranch(branchConfig, rx, status.negative == status.overflow), // BranchGreaterThanEqual
 
-                    7 => {}, // BranchLessThanUnsigned
-                    8 => {}, // BranchLessThanSigned
-                    9 => {}, // BranchLessThanEqualUnsigned
-                    10 => {}, // BranchLessThanEqualSigned
+                    5 => self.handleBranch(branchConfig, rx, status.negative != status.overflow), // BranchLessThan
+                    6 => self.handleBranch(branchConfig, rx, status.zero or (status.negative != status.overflow)), // BranchLessThanEqual
 
-                    11 => {}, // BranchLessThanUnsigned
-                    12 => {}, // BranchLessThanSigned
-                    13 => {}, // BranchLessThanEqualUnsigned
-                    14 => {}, // BranchLessThanEqualSigned
-
-                    15 => {}, // BranchLessThanUnsigned
-                    16 => {}, // BranchLessThanSigned
-                    17 => {}, // BranchLessThanEqualUnsigned
-                    18 => {}, // BranchLessThanEqualSigned
                     else => std.debug.print("Error unknown instruction: '{}'", .{instruction}),
                 }
             },
@@ -121,6 +114,7 @@ pub const CPU = struct {
     }
     const ArithmeticOperation = enum { plus, minus };
     const ArithmeticResult = struct { result: u32, carry: bool, overflow: bool };
+    const BranchConfig = struct { updateLinkRegister: bool };
 
     fn calculateArithmeticResult(a: u32, operation: ArithmeticOperation, b: u32) ArithmeticResult {
         var arithmeticResult = ArithmeticResult{
@@ -153,6 +147,8 @@ pub const CPU = struct {
     }
 
     fn storeArithmeticStatus(self: *CPU, arithmeticResult: ArithmeticResult) void {
+        self.registers[StatusRegister] &= ~ZeroMask;
+        self.registers[StatusRegister] &= ~NegativeMask;
         self.registers[StatusRegister] &= ~CarryMask;
         self.registers[StatusRegister] &= ~OverflowMask;
 
@@ -162,6 +158,14 @@ pub const CPU = struct {
 
         if (arithmeticResult.overflow) {
             self.registers[StatusRegister] |= OverflowMask;
+        }
+
+        if (arithmeticResult.result == 0) {
+            self.registers[StatusRegister] |= ZeroMask;
+        }
+
+        if (arithmeticResult.result >> 31 == 1) {
+            self.registers[StatusRegister] |= NegativeMask;
         }
     }
 
@@ -236,5 +240,21 @@ pub const CPU = struct {
     fn compareOp(self: *CPU, rx: u3, ry: u3) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, self.registers[ry]);
         self.storeArithmeticStatus(result);
+    }
+
+    fn handleBranch(self: *CPU, branchConfig: BranchConfig, rx: u3, shouldBranch: bool) void {
+        if (shouldBranch) {
+            if (branchConfig.updateLinkRegister) {
+                self.registers[LinkRegister] = self.registers[ProgramCounter];
+            }
+            self.registers[ProgramCounter] = self.registers[rx];
+        }
+    }
+
+    const StatusRegisterResult = struct { zero: bool, negative: bool, overflow: bool, carry: bool };
+
+    pub fn getStatus(self: *CPU) StatusRegisterResult {
+        const status = self.registers[StatusRegister];
+        return StatusRegisterResult{ .zero = (status & ZeroMask) == ZeroMask, .negative = (status & NegativeMask) == NegativeMask, .overflow = (status & OverflowMask) == OverflowMask, .carry = (status & CarryMask) == CarryMask };
     }
 };

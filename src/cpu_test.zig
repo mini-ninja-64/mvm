@@ -15,14 +15,6 @@ fn generate2RegisterInstruction(opcode: u8, rx: u4, ry: u4) u16 {
     return @as(u16, opcode) << 8 | @as(u16, rx) << 4 | ry;
 }
 
-fn carried(register: u32) bool {
-    return (register & cpu.CPU.CarryMask) > 0;
-}
-
-fn overflowed(register: u32) bool {
-    return (register & cpu.CPU.OverflowMask) > 0;
-}
-
 test "Adds constants" {
     var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
@@ -78,7 +70,7 @@ test "Subtracts registers" {
     try testing.expectEqual(@as(u32, 40 - 15), mvmCpu.registers[0]);
 }
 
-test "Updates overflow and carry flags on arithmetic operations" {
+test "Updates zero, negative, overflow and carry flags on arithmetic operations" {
     var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     const MAX: u32 = 0xFFFFFFFF;
@@ -92,62 +84,86 @@ test "Updates overflow and carry flags on arithmetic operations" {
     mvmCpu.registers[0] = MAX;
     mvmCpu.execute(generate1RegisterConstantInstruction(0b0000, 0, POSITIVE_1));
     try testing.expectEqual(ZERO, mvmCpu.registers[0]);
-    try testing.expect(carried(mvmCpu.registers[4]));
-    try testing.expect(!overflowed(mvmCpu.registers[4]));
+    var status = mvmCpu.getStatus();
+    try testing.expect(status.zero);
+    try testing.expect(!status.negative);
+    try testing.expect(status.carry);
+    try testing.expect(!status.overflow);
 
     // MAX_SIGNED + 1 = N/A or MAX_SIGNED + 1 = MIN_SIGNED (overflow)
     mvmCpu.registers[0] = MAX_SIGNED;
     mvmCpu.execute(generate1RegisterConstantInstruction(0b0000, 0, 1));
     try testing.expectEqual(MIN_SIGNED, mvmCpu.registers[0]);
-    try testing.expect(!carried(mvmCpu.registers[4]));
-    try testing.expect(overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.zero);
+    try testing.expect(status.negative);
+    try testing.expect(!status.carry);
+    try testing.expect(status.overflow);
 
     // MIN_SIGNED + (-1) = MAX_SIGNED (carry & overflow)
     mvmCpu.registers[0] = MIN_SIGNED;
     mvmCpu.registers[1] = NEGATIVE_1;
     mvmCpu.execute(generate3RegisterInstruction(0b0001, 0, 0, 1));
     try testing.expectEqual(MAX_SIGNED, mvmCpu.registers[0]);
-    try testing.expect(carried(mvmCpu.registers[4]));
-    try testing.expect(overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.zero);
+    try testing.expect(!status.negative);
+    try testing.expect(status.carry);
+    try testing.expect(status.overflow);
 
     // MAX_SIGNED - (-1) = MIN_SIGNED (overflow)
     mvmCpu.registers[0] = MAX_SIGNED;
     mvmCpu.registers[1] = NEGATIVE_1;
     mvmCpu.execute(generate3RegisterInstruction(0b0011, 0, 0, 1));
     try testing.expectEqual(MIN_SIGNED, mvmCpu.registers[0]);
-    try testing.expect(carried(mvmCpu.registers[4]));
-    try testing.expect(overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.zero);
+    try testing.expect(status.negative);
+    try testing.expect(status.carry);
+    try testing.expect(status.overflow);
 
     // MIN_SIGNED - (+1) = MAX_SIGNED (overflow)
     mvmCpu.registers[0] = MIN_SIGNED;
     mvmCpu.registers[1] = POSITIVE_1;
     mvmCpu.execute(generate3RegisterInstruction(0b0011, 0, 0, 1));
     try testing.expectEqual(MAX_SIGNED, mvmCpu.registers[0]);
-    try testing.expect(!carried(mvmCpu.registers[4]));
-    try testing.expect(overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.zero);
+    try testing.expect(!status.negative);
+    try testing.expect(!status.carry);
+    try testing.expect(status.overflow);
 
     // 0 - (+1) = -1 or 0 - (+1) = MAX (carry)
     mvmCpu.registers[0] = ZERO;
     mvmCpu.registers[1] = POSITIVE_1;
     mvmCpu.execute(generate3RegisterInstruction(0b0011, 0, 0, 1));
     try testing.expectEqual(NEGATIVE_1, mvmCpu.registers[0]);
-    try testing.expect(carried(mvmCpu.registers[4]));
-    try testing.expect(!overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.zero);
+    try testing.expect(status.negative);
+    try testing.expect(status.carry);
+    try testing.expect(!status.overflow);
 }
 
-test "Resets overflow and carry flags on arithmetic operations" {
+test "Resets zero, negative overflow and carry flags on arithmetic operations" {
     var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
 
     mvmCpu.registers[0] = 0x7FFFFFFF;
     mvmCpu.registers[1] = 0xFFFFFFFF;
     mvmCpu.execute(generate3RegisterInstruction(0b0011, 0, 0, 1));
-    try testing.expect(carried(mvmCpu.registers[4]));
-    try testing.expect(overflowed(mvmCpu.registers[4]));
+    var status = mvmCpu.getStatus();
+    try testing.expect(status.carry);
+    try testing.expect(status.overflow);
+    try testing.expect(status.negative);
+    try testing.expect(!status.zero);
 
     mvmCpu.registers[0] = 0;
     mvmCpu.execute(generate3RegisterInstruction(0b0001, 0, 0, 0));
-    try testing.expect(!carried(mvmCpu.registers[4]));
-    try testing.expect(!overflowed(mvmCpu.registers[4]));
+    status = mvmCpu.getStatus();
+    try testing.expect(!status.carry);
+    try testing.expect(!status.overflow);
+    try testing.expect(!status.negative);
+    try testing.expect(status.zero);
 }
 
 test "Writes constants to registers" {
@@ -293,4 +309,93 @@ test "Compares provided registers" {
     // TODO
 }
 
-// TODO: branching tests
+// TODO: Test update link register behaviour
+// TODO: Test negative cases in branching tests
+
+const BranchConfig = struct { updateLinkRegister: bool };
+
+fn generateBranchInstruction(opcode: u10, branchConfig: BranchConfig, rx: u4) u16 {
+    const branchConfigBinary: u2 = if (branchConfig.updateLinkRegister)
+        0b01
+    else
+        0b00;
+    return @as(u16, opcode) << 6 | @as(u16, branchConfigBinary) << 4 | rx;
+}
+
+test "Unconditional branch always jumps to the new address" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0000, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch equal jumps to the new address when zero status is set" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] = cpu.CPU.ZeroMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0001, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch not equal jumps to the new address when zero status is not set" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0010, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch more than jumps to the new address when zero status is not set and negative status is equal to overflow" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
+    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0011, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch greater than jumps to the new address when zero is not set and negative is equal to overflow" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
+    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
+    mvmCpu.registers[4] &= cpu.CPU.OverflowMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0011, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch greater than equal jumps to the new address when negative is equal to overflow" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
+    mvmCpu.registers[4] &= cpu.CPU.OverflowMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch less than jumps to the new address when negative is not equal to overflow" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
+    mvmCpu.registers[4] &= ~cpu.CPU.OverflowMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
+
+test "Branch less than equal jumps to the new address when zero is set or negative is not equal to overflow" {
+    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+
+    mvmCpu.registers[0] = 0xAABBCCDD;
+    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
+    mvmCpu.registers[4] &= ~cpu.CPU.OverflowMask;
+    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
+    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+}
