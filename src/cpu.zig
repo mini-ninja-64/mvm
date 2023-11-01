@@ -21,8 +21,10 @@ test "Successfully extracts bytes" {
     try expect(getByte(0x00FF, 1) == 0xFF);
 }
 
+const ZERO_MEMORY = [_]u8{};
+
 pub const CPU = struct {
-    memory: []u8,
+    memory: []u8 = &ZERO_MEMORY,
     registers: [8]u32 = std.mem.zeroes([8]u32),
 
     pub const StatusRegister: u3 = 4;

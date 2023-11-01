@@ -3,8 +3,6 @@ const testing = @import("std").testing;
 
 const cpu = @import("cpu.zig");
 
-const ZERO_MEMORY = [_]u8{};
-
 fn generate3RegisterInstruction(opcode: u4, rx: u4, ry: u4, rz: u4) u16 {
     return @as(u16, opcode) << 12 | @as(u16, rx) << 8 | @as(u16, ry) << 4 | rz;
 }
@@ -16,7 +14,7 @@ fn generate2RegisterInstruction(opcode: u8, rx: u4, ry: u4) u16 {
 }
 
 test "Adds constants" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     const register = 0;
     mvmCpu.registers[register] = 100;
@@ -28,7 +26,7 @@ test "Adds constants" {
 }
 
 test "Adds registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[1] = 40;
     mvmCpu.registers[2] = 15;
@@ -40,7 +38,7 @@ test "Adds registers" {
 }
 
 test "Subtracts constants" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     const register = 0;
     mvmCpu.registers[register] = 100;
@@ -59,7 +57,7 @@ test "Subtracts constants" {
 }
 
 test "Subtracts registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[1] = 40;
     mvmCpu.registers[2] = 15;
@@ -71,7 +69,7 @@ test "Subtracts registers" {
 }
 
 test "Updates zero, negative, overflow and carry flags on arithmetic operations" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     const MAX: u32 = 0xFFFFFFFF;
     const MAX_SIGNED: u32 = 0x7FFFFFFF;
@@ -146,7 +144,7 @@ test "Updates zero, negative, overflow and carry flags on arithmetic operations"
 }
 
 test "Resets zero, negative overflow and carry flags on arithmetic operations" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0x7FFFFFFF;
     mvmCpu.registers[1] = 0xFFFFFFFF;
@@ -167,7 +165,7 @@ test "Resets zero, negative overflow and carry flags on arithmetic operations" {
 }
 
 test "Writes constants to registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     const instruction = generate1RegisterConstantInstruction(0b0100, 0, 0xFF);
     mvmCpu.execute(instruction);
@@ -176,7 +174,7 @@ test "Writes constants to registers" {
 }
 
 test "Bitwise left shift correctly shifts a register" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 8;
@@ -185,7 +183,7 @@ test "Bitwise left shift correctly shifts a register" {
 }
 
 test "Bitwise right shift correctly shifts a register" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 8;
@@ -194,7 +192,7 @@ test "Bitwise right shift correctly shifts a register" {
 }
 
 test "Bitwise or correctly or's registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 0xDDCCBBAA;
@@ -203,7 +201,7 @@ test "Bitwise or correctly or's registers" {
 }
 
 test "Bitwise and correctly and's registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[1] = 0xDDCCBBAA;
@@ -212,7 +210,7 @@ test "Bitwise and correctly and's registers" {
 }
 
 test "Bitwise flip correctly flips a register" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCFF;
     mvmCpu.execute(generate3RegisterInstruction(0b1001, 1, 0, 0));
@@ -220,7 +218,7 @@ test "Bitwise flip correctly flips a register" {
 }
 
 test "Bitwise xor correctly xor's registers" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCF0;
     mvmCpu.registers[1] = 0xDDCCBBFF;
@@ -229,7 +227,7 @@ test "Bitwise xor correctly xor's registers" {
 }
 
 test "Copies registers correctly" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0;
     mvmCpu.registers[1] = 0xAABBCCDD;
@@ -323,7 +321,7 @@ fn generateBranchInstruction(opcode: u10, branchConfig: BranchConfig, rx: u4) u1
 }
 
 test "Unconditional branch always jumps to the new address" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
 
@@ -332,7 +330,7 @@ test "Unconditional branch always jumps to the new address" {
 }
 
 test "Branch equal jumps to the new address when zero status is set" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] = cpu.CPU.ZeroMask;
@@ -341,7 +339,7 @@ test "Branch equal jumps to the new address when zero status is set" {
 }
 
 test "Branch not equal jumps to the new address when zero status is not set" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
@@ -350,7 +348,7 @@ test "Branch not equal jumps to the new address when zero status is not set" {
 }
 
 test "Branch more than jumps to the new address when zero status is not set and negative status is equal to overflow" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
@@ -360,7 +358,7 @@ test "Branch more than jumps to the new address when zero status is not set and 
 }
 
 test "Branch greater than jumps to the new address when zero is not set and negative is equal to overflow" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
@@ -371,7 +369,7 @@ test "Branch greater than jumps to the new address when zero is not set and nega
 }
 
 test "Branch greater than equal jumps to the new address when negative is equal to overflow" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
@@ -381,7 +379,7 @@ test "Branch greater than equal jumps to the new address when negative is equal 
 }
 
 test "Branch less than jumps to the new address when negative is not equal to overflow" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
@@ -391,7 +389,7 @@ test "Branch less than jumps to the new address when negative is not equal to ov
 }
 
 test "Branch less than equal jumps to the new address when zero is set or negative is not equal to overflow" {
-    var mvmCpu = cpu.CPU{ .memory = &ZERO_MEMORY };
+    var mvmCpu = cpu.CPU{};
 
     mvmCpu.registers[0] = 0xAABBCCDD;
     mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
