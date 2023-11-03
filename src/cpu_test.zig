@@ -307,93 +307,241 @@ test "Compares provided registers" {
     // TODO
 }
 
-// TODO: Test update link register behaviour
-// TODO: Test negative cases in branching tests
-
-const BranchConfig = struct { updateLinkRegister: bool };
-
-fn generateBranchInstruction(opcode: u10, branchConfig: BranchConfig, rx: u4) u16 {
-    const branchConfigBinary: u2 = if (branchConfig.updateLinkRegister)
+fn generateBranchInstruction(opcode: u10, updateLinkRegister: bool, rx: u4) u16 {
+    const branchConfigBinary: u2 = if (updateLinkRegister)
         0b01
     else
         0b00;
     return @as(u16, opcode) << 6 | @as(u16, branchConfigBinary) << 4 | rx;
 }
 
+const AluStatus = struct { zero: bool = false, negative: bool = false, carry: bool = false, overflow: bool = false };
+const BranchTestConfig = struct { opCode: u10, status: AluStatus, address: u32, shouldJump: bool, initialProgramCounter: u32 = 0 };
+
 test "Unconditional branch always jumps to the new address" {
-    var mvmCpu = cpu.CPU{};
-
-    mvmCpu.registers[0] = 0xAABBCCDD;
-
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0000, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0000,
+        .status = AluStatus{},
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0000,
+        .status = AluStatus{ .zero = true, .negative = true, .carry = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 }
 
 test "Branch equal jumps to the new address when zero status is set" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0001,
+        .status = AluStatus{ .zero = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] = cpu.CPU.ZeroMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0001, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0001,
+        .status = AluStatus{ .zero = false, .negative = true, .carry = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
 }
 
 test "Branch not equal jumps to the new address when zero status is not set" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0010,
+        .status = AluStatus{},
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0010, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
-}
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0010,
+        .status = AluStatus{ .zero = false, .negative = true, .carry = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-test "Branch more than jumps to the new address when zero status is not set and negative status is equal to overflow" {
-    var mvmCpu = cpu.CPU{};
-
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
-    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0011, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0010,
+        .status = AluStatus{ .zero = true, .negative = true, .carry = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
 }
 
 test "Branch greater than jumps to the new address when zero is not set and negative is equal to overflow" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0011,
+        .status = AluStatus{ .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= ~cpu.CPU.ZeroMask;
-    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
-    mvmCpu.registers[4] &= cpu.CPU.OverflowMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0011, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0011,
+        .status = AluStatus{ .negative = false, .overflow = false },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0011,
+        .status = AluStatus{ .negative = true, .overflow = false },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0011,
+        .status = AluStatus{ .zero = true, .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
 }
 
 test "Branch greater than equal jumps to the new address when negative is equal to overflow" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0100,
+        .status = AluStatus{ .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
-    mvmCpu.registers[4] &= cpu.CPU.OverflowMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0100,
+        .status = AluStatus{ .negative = false, .overflow = false },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0100,
+        .status = AluStatus{ .negative = false, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
 }
 
 test "Branch less than jumps to the new address when negative is not equal to overflow" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0101,
+        .status = AluStatus{ .negative = false, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
-    mvmCpu.registers[4] &= ~cpu.CPU.OverflowMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0101,
+        .status = AluStatus{ .negative = true, .overflow = false },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0101,
+        .status = AluStatus{ .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
 }
 
 test "Branch less than equal jumps to the new address when zero is set or negative is not equal to overflow" {
-    var mvmCpu = cpu.CPU{};
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .negative = false, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
 
-    mvmCpu.registers[0] = 0xAABBCCDD;
-    mvmCpu.registers[4] &= cpu.CPU.NegativeMask;
-    mvmCpu.registers[4] &= ~cpu.CPU.OverflowMask;
-    mvmCpu.execute(generateBranchInstruction(0b1111_00_0100, .{ .updateLinkRegister = true }, 0));
-    try testing.expectEqual(@as(u32, 0xAABBCCDD), mvmCpu.registers[cpu.CPU.ProgramCounter]);
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .negative = true, .overflow = false },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = false,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .zero = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .zero = true, .negative = false, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+
+    try testBranch(BranchTestConfig{
+        .opCode = 0b1111_00_0110,
+        .status = AluStatus{ .zero = true, .negative = true, .overflow = true },
+        .initialProgramCounter = 0xDDCCBBAA,
+        .address = 0xAABBCCDD,
+        .shouldJump = true,
+    });
+}
+
+fn testBranch(testConfig: BranchTestConfig) !void {
+    for ([_]bool{ true, false }) |updateLinkRegister| {
+        const rx = 0;
+        var mvmCpu = cpu.CPU{};
+        mvmCpu.registers[rx] = testConfig.address;
+
+        if (testConfig.status.negative) mvmCpu.registers[4] |= cpu.CPU.NegativeMask;
+        if (testConfig.status.zero) mvmCpu.registers[4] |= cpu.CPU.ZeroMask;
+        if (testConfig.status.carry) mvmCpu.registers[4] |= cpu.CPU.CarryMask;
+        if (testConfig.status.overflow) mvmCpu.registers[4] |= cpu.CPU.OverflowMask;
+
+        const previousPC = mvmCpu.registers[cpu.CPU.ProgramCounter];
+        const previousLinkRegister = mvmCpu.registers[cpu.CPU.LinkRegister];
+        mvmCpu.execute(generateBranchInstruction(testConfig.opCode, updateLinkRegister, rx));
+
+        const newAddress = mvmCpu.registers[cpu.CPU.ProgramCounter];
+        if (testConfig.shouldJump) {
+            try testing.expectEqual(testConfig.address, newAddress);
+        } else {
+            try testing.expect(testConfig.address != newAddress);
+        }
+
+        const linkRegister = mvmCpu.registers[cpu.CPU.LinkRegister];
+        if (updateLinkRegister) {
+            try testing.expectEqual(previousPC, linkRegister);
+        } else {
+            try testing.expectEqual(previousLinkRegister, linkRegister);
+        }
+    }
 }
