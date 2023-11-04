@@ -38,6 +38,20 @@ pub const CPU = struct {
     pub const CarryMask: u32 = 0b00100000000000000000000000000000;
     pub const OverflowMask: u32 = 0b00010000000000000000000000000000;
 
+    const INSTRUCTION_SIZE = 2;
+
+    pub fn fetch(self: *CPU) u16 {
+        const upperNibble = @as(u16, self.memory[self.registers[ProgramCounter]]) << 8;
+        const lowerNibble = @as(u16, self.memory[self.registers[ProgramCounter] + 1]);
+        // TODO: Check for program counter overflow
+        self.registers[ProgramCounter] += INSTRUCTION_SIZE;
+        return upperNibble | lowerNibble;
+    }
+
+    pub fn cycle(self: *CPU) void {
+        self.execute(self.fetch());
+    }
+
     pub fn execute(self: *CPU, instruction: u16) void {
         const startNibble: u4 = getNibble(instruction, 0);
 
