@@ -224,7 +224,7 @@ pub const CPU = struct {
         }
         const memoryAddress = self.registers[ry];
         for (0..length) |i| {
-            var shiftLength = @as(u5, @truncate(((length - 1) - i) * 8));
+            var shiftLength = @as(u5, @truncate(i * 8));
             self.registers[rx] |= @as(u32, self.memory[memoryAddress + i]) << shiftLength;
         }
     }
@@ -234,7 +234,7 @@ pub const CPU = struct {
         }
         const memoryAddress = self.registers[ry];
         for (0..length) |i| {
-            var shiftLength = @as(u5, @truncate(((length - 1) - i) * 8));
+            var shiftLength = @as(u5, @truncate(i * 8));
             self.memory[memoryAddress + i] = @as(u8, @truncate(self.registers[rx] >> shiftLength));
         }
     }

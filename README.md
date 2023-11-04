@@ -67,3 +67,7 @@ Registers 8 onwards may be available for hardware peripherals such as serial.
 | Bit     | 0        | 1                  |
 |---------|----------|--------------------|
 | Purpose | Reserved | UpdateLinkRegister |
+
+### Notes
+
+- MVM CPU's are little endian, this is only important when carrying out load and store op's

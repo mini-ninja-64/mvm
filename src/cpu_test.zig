@@ -245,7 +245,7 @@ test "Copies data from memory address to register" {
     mvmCpu.registers[1] = 4;
 
     mvmCpu.execute(generate2RegisterInstruction(0b11100001, 0, 1));
-    try testing.expectEqual(@as(u32, 0xEEFFAABB), mvmCpu.registers[0]);
+    try testing.expectEqual(@as(u32, 0xBBAAFFEE), mvmCpu.registers[0]);
 }
 
 test "Copies data from register to memory address" {
@@ -256,7 +256,7 @@ test "Copies data from register to memory address" {
     mvmCpu.registers[1] = 2;
 
     mvmCpu.execute(generate2RegisterInstruction(0b11100010, 0, 1));
-    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 0x00, 0x00 }, memory[0..8]);
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xDD, 0xCC, 0xBB, 0xAA, 0x00, 0x00 }, memory[0..8]);
 }
 
 test "Copies half word from memory address to register" {
@@ -267,7 +267,7 @@ test "Copies half word from memory address to register" {
     mvmCpu.registers[1] = 1;
 
     mvmCpu.execute(generate2RegisterInstruction(0b11100011, 0, 1));
-    try testing.expectEqual(@as(u32, 0xBBCC), mvmCpu.registers[0]);
+    try testing.expectEqual(@as(u32, 0xCCBB), mvmCpu.registers[0]);
 }
 
 test "Copies half word from register to memory address" {
@@ -278,7 +278,7 @@ test "Copies half word from register to memory address" {
     mvmCpu.registers[1] = 2;
 
     mvmCpu.execute(generate2RegisterInstruction(0b11100100, 0, 1));
-    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xCC, 0xDD, 0x00, 0x00, 0x00, 0x00 }, memory[0..8]);
+    try testing.expectEqualSlices(u8, &[_]u8{ 0x00, 0x00, 0xDD, 0xCC, 0x00, 0x00, 0x00, 0x00 }, memory[0..8]);
 }
 
 test "Copies byte from memory address to register" {
