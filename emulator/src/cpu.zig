@@ -25,12 +25,12 @@ const ZERO_MEMORY = [_]u8{};
 
 pub const CPU = struct {
     memory: []u8 = &ZERO_MEMORY,
-    registers: [8]u32 = std.mem.zeroes([8]u32),
+    registers: [16]u32 = std.mem.zeroes([16]u32),
 
-    pub const StatusRegister: u3 = 4;
-    pub const StackPointer: u3 = 5;
-    pub const LinkRegister: u3 = 6;
-    pub const ProgramCounter: u3 = 7;
+    pub const StatusRegister: u4 = 12;
+    pub const StackPointer: u4 = 13;
+    pub const LinkRegister: u4 = 14;
+    pub const ProgramCounter: u4 = 15;
 
     // TODO: should be public?
     pub const ZeroMask: u32 = 0b10000000000000000000000000000000;
@@ -40,16 +40,20 @@ pub const CPU = struct {
 
     const INSTRUCTION_SIZE = 2;
 
-    pub fn fetch(self: *CPU) u16 {
-        const upperNibble = @as(u16, self.memory[self.registers[ProgramCounter]]) << 8;
-        const lowerNibble = @as(u16, self.memory[self.registers[ProgramCounter] + 1]);
+    pub const CpuError = error{OutOfBoundsFetch};
+
+    pub fn fetch(self: *CPU) CpuError!u16 {
+        const pc = self.registers[ProgramCounter];
+        if (pc >= self.memory.len) return CpuError.OutOfBoundsFetch;
+        const upperNibble = @as(u16, self.memory[pc]) << 8;
+        const lowerNibble = @as(u16, self.memory[pc + 1]);
         // TODO: Check for program counter overflow
         self.registers[ProgramCounter] += INSTRUCTION_SIZE;
         return upperNibble | lowerNibble;
     }
 
-    pub fn cycle(self: *CPU) void {
-        self.execute(self.fetch());
+    pub fn cycle(self: *CPU) CpuError!void {
+        self.execute(try self.fetch());
     }
 
     pub fn execute(self: *CPU, instruction: u16) void {

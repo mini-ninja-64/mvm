@@ -521,10 +521,10 @@ fn testBranch(testConfig: BranchTestConfig) !void {
         var mvmCpu = cpu.CPU{};
         mvmCpu.registers[rx] = testConfig.address;
 
-        if (testConfig.status.negative) mvmCpu.registers[4] |= cpu.CPU.NegativeMask;
-        if (testConfig.status.zero) mvmCpu.registers[4] |= cpu.CPU.ZeroMask;
-        if (testConfig.status.carry) mvmCpu.registers[4] |= cpu.CPU.CarryMask;
-        if (testConfig.status.overflow) mvmCpu.registers[4] |= cpu.CPU.OverflowMask;
+        if (testConfig.status.negative) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.NegativeMask;
+        if (testConfig.status.zero) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.ZeroMask;
+        if (testConfig.status.carry) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.CarryMask;
+        if (testConfig.status.overflow) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.OverflowMask;
 
         const previousPC = mvmCpu.registers[cpu.CPU.ProgramCounter];
         const previousLinkRegister = mvmCpu.registers[cpu.CPU.LinkRegister];
@@ -552,7 +552,7 @@ test "Fetching an instruction should return the instruction currently pointed to
 
     mvmCpu.registers[cpu.CPU.ProgramCounter] = 2;
 
-    const fetchedInstruction = mvmCpu.fetch();
+    const fetchedInstruction = try mvmCpu.fetch();
 
     try testing.expectEqual(@as(u16, 0xCCDD), fetchedInstruction);
 }
@@ -562,7 +562,7 @@ test "Fetching an instruction should increment the program counter" {
     var mvmCpu = cpu.CPU{ .memory = &memory };
 
     const previousPc = mvmCpu.registers[cpu.CPU.ProgramCounter];
-    _ = mvmCpu.fetch();
+    _ = try mvmCpu.fetch();
 
     const updatedPc = mvmCpu.registers[cpu.CPU.ProgramCounter];
     try testing.expectEqual(previousPc + 2, updatedPc);
@@ -572,12 +572,12 @@ test "Cycle should fetch and then execute instructions" {
     var memory = [_]u8{ 0b0000_0000, 0b0000_1011, 0b0000_0000, 0b0000_0001 };
     var mvmCpu = cpu.CPU{ .memory = &memory };
 
-    mvmCpu.cycle();
+    try mvmCpu.cycle();
 
     try testing.expectEqual(@as(u32, 0b1011), mvmCpu.registers[0]);
     try testing.expectEqual(@as(u32, 2), mvmCpu.registers[cpu.CPU.ProgramCounter]);
 
-    mvmCpu.cycle();
+    try mvmCpu.cycle();
 
     try testing.expectEqual(@as(u32, 0b1100), mvmCpu.registers[0]);
     try testing.expectEqual(@as(u32, 4), mvmCpu.registers[cpu.CPU.ProgramCounter]);
