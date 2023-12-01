@@ -1,0 +1,30 @@
+ENTRYPOINT MAIN;
+
+MULTIPLY: {
+    // r0 = A
+    // r1 = B
+    
+    // r2 is copy of B and will be decremented
+    // r3 is the result of multiplication
+    // r4 is zeroed out for reference
+    // r5 is address of INNER_LOOP
+    Subtract(r3, r3, r3); // Zero out r3
+    Subtract(r4, r4, r4); // Zero out r4
+    CopyRegister(r2, r1); // r2 = r1
+    WriteConstant(r5, $MULTIPLY_LOOP);
+    MULTIPLY_LOOP: {
+        Compare(r3, r4);
+        BranchEqual(b00, LR);
+
+        Add(r3, r3, r0);
+        SubtractConstant(r2, #1);
+        BranchAlways(r5);
+    }
+}
+
+MAIN: {
+    WriteConstant(r0, #2);
+    WriteConstant(r1, #3);
+    WriteConstant(r11, $MULTIPLY);
+    BranchAlways(b01, r11);
+}

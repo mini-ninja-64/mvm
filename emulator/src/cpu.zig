@@ -42,6 +42,14 @@ pub const CPU = struct {
 
     pub const CpuError = error{OutOfBoundsFetch};
 
+    pub fn peekNext(self: *CPU) CpuError!u16 {
+        const pc = self.registers[ProgramCounter];
+        if (pc >= self.memory.len) return CpuError.OutOfBoundsFetch;
+        const upperNibble = @as(u16, self.memory[pc]) << 8;
+        const lowerNibble = @as(u16, self.memory[pc + 1]);
+        return upperNibble | lowerNibble;
+    }
+
     pub fn fetch(self: *CPU) CpuError!u16 {
         const pc = self.registers[ProgramCounter];
         if (pc >= self.memory.len) return CpuError.OutOfBoundsFetch;

@@ -4,24 +4,24 @@
 
 An MVM CPU has 16*32 bit registers
 
-| Index | Description              | Read/Write | Reset Value           | Layout                                                                |
-|-------|--------------------------|------------|-----------------------|-----------------------------------------------------------------------|
-| 0     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 1     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 2     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 3     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 4     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 5     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 6     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 7     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 8     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 9     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 10    | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 11    | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
-| 12    | Status Register          | RO         | 0b0000 0000 0000 0000 | equal[1] negative[1] carry[1] overflow[1] reserved[20] failureCode[8] |
-| 13    | Stack Pointer            | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
-| 14    | Link Register            | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
-| 15    | Program Counter          | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
+| Index | Name    | Description              | Read/Write | Reset Value           | Layout                                                                |
+|-------|---------|--------------------------|------------|-----------------------|-----------------------------------------------------------------------|
+| 0     | R0      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 1     | R1      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 2     | R2      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 3     | R3      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 4     | R4      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 5     | R5      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 6     | R6      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 7     | R7      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 8     | R8      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 9     | R9      | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 10    | R10     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 11    | R11     | General Purpose Register | RW         | 0b0000 0000 0000 0000 | N/A                                                                   |
+| 12    | STATUS  | Status Register          | RO         | 0b0000 0000 0000 0000 | equal[1] negative[1] carry[1] overflow[1] reserved[20] failureCode[8] |
+| 13    | SP      | Stack Pointer            | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
+| 14    | LR      | Link Register            | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
+| 15    | PC      | Program Counter          | RW         | 0b0000 0000 0000 0000 | todo[32]                                                              |
 
 ## Instruction Set
 
