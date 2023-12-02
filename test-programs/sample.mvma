@@ -1,4 +1,4 @@
-ENTRYPOINT MAIN;
+.ENTRYPOINT(MAIN);
 
 MULTIPLY: {
     // r0 = A
