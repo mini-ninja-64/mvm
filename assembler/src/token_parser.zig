@@ -6,7 +6,21 @@ pub fn Token(comptime T: type) type {
     if (T == void) return struct { value: void = {}, position: MvmaSource.FilePosition };
     return struct { value: T, position: MvmaSource.FilePosition };
 }
-const TokenUnion = union(TokenType) { BlockOpen: Token(void), BlockClose: Token(void), BracketOpen: Token(void), BracketClose: Token(void), Dot: Token(void), Colon: Token(void), Identifier: Token(std.ArrayList(u8)), Address: Token(std.ArrayList(u8)), Number: Token(u32), Comment: Token(std.ArrayList(u8)), Semicolon: Token(void), Comma: Token(void), Invalid: Token([]const u8) };
+pub const TokenUnion = union(TokenType) {
+    BlockOpen: Token(void),
+    BlockClose: Token(void),
+    BracketOpen: Token(void),
+    BracketClose: Token(void),
+    Dot: Token(void),
+    Colon: Token(void),
+    Identifier: Token(std.ArrayList(u8)),
+    Address: Token(std.ArrayList(u8)),
+    Number: Token(u32),
+    Comment: Token(std.ArrayList(u8)),
+    Semicolon: Token(void),
+    Comma: Token(void),
+    Invalid: Token([]const u8),
+};
 
 pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayList(TokenUnion) {
     var tokens = std.ArrayList(TokenUnion).init(allocator);
