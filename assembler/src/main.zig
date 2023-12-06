@@ -1,6 +1,7 @@
 const std = @import("std");
 const MvmaSource = @import("./mvma.zig").MvmaSource;
 const tokenParser = @import("./token_parser.zig");
+const parser = @import("./parser.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -26,20 +27,16 @@ pub fn main() !void {
     std.debug.print("Completed parsing\n", .{});
     defer tokens.clearAndFree();
 
+    var statements = parser.toStatements(tokens.items);
+    _ = statements;
+
     for (tokens.items) |*token| {
-        const tokenType: tokenParser.TokenType = token.*;
+        tokenParser.printToken(token.*);
         switch (token.*) {
             .Address, .Identifier, .Comment => |*stringToken| {
-                std.debug.print("{}: '{s}'\n", .{ tokenType, stringToken.value.items });
                 stringToken.value.clearAndFree();
             },
-            .Number => |number| {
-                std.debug.print("{}: {}\n", .{ tokenType, number.value });
-            },
-            .Invalid => |invalid| {
-                std.debug.print("Error: {s} @ {}:{}\n", .{ invalid.value, invalid.position.line, invalid.position.column });
-            },
-            else => std.debug.print("{}\n", .{tokenType}),
+            else => {},
         }
     }
 }

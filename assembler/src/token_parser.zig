@@ -22,6 +22,22 @@ pub const TokenUnion = union(TokenType) {
     Invalid: Token([]const u8),
 };
 
+pub fn printToken(token: TokenUnion) void {
+    const tokenType: TokenType = token;
+    switch (token) {
+        .Address, .Identifier, .Comment => |string| {
+            std.debug.print("{}: '{s}'\n", .{ tokenType, string.value.items });
+        },
+        .Number => |number| {
+            std.debug.print("{}: {}\n", .{ tokenType, number.value });
+        },
+        .Invalid => |invalid| {
+            std.debug.print("Error: {s} @ {}:{}\n", .{ invalid.value, invalid.position.line, invalid.position.column });
+        },
+        else => std.debug.print("{}\n", .{tokenType}),
+    }
+}
+
 pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayList(TokenUnion) {
     var tokens = std.ArrayList(TokenUnion).init(allocator);
     var stringBuffer = std.ArrayList(u8).init(allocator);

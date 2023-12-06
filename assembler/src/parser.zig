@@ -54,12 +54,13 @@ const TokenReader = struct {
         return self.tokens[self.position];
     }
 
+    // TODO: should be able to return null
     pub fn current(self: *TokenReader) TokenUnion {
         return self.tokens[self.position];
     }
 };
 
-fn handleArgList(tokenReader: TokenReader) void {
+fn handleArgList(tokenReader: *TokenReader) void {
     if (tokenReader.next() == TokenType.BracketOpen) {
         tokenReader.consume();
         while (tokenReader.next() == TokenType.Address or tokenReader.next() == TokenType.Number or tokenReader.next() == TokenType.Identifier) {
@@ -69,31 +70,70 @@ fn handleArgList(tokenReader: TokenReader) void {
     } else {}
 }
 
-fn handleBlock(tokenReader: TokenReader) ?TokenUnion {
+fn handleBlock(tokenReader: *TokenReader) void {
+    if (tokenReader.current() != TokenUnion.BlockOpen) {
+        std.debug.print("ERROR: INVALID BLOCK", .{});
+    }
     while (tokenReader.consume()) |token| {
         switch (token) {
-            TokenType.Dot, TokenType.Identifier => {
-                if (token == TokenType.Dot) _ = tokenReader.consume();
-                const invocationId = tokenReader.current();
-                handleArgList(tokenReader);
-                const invocation = Invocation{ .identifier = invocationId.Identifier.value };
-                _ = invocation;
+            TokenType.Dot, TokenType.Identifier, TokenType.Comment => {
+                handleTopLevel(tokenReader);
             },
-            TokenType.Comment => {},
+            TokenType.BlockClose => {},
             else => {},
         }
     }
+    // while (tokenReader.consume()) |token| {
+    //     switch (token) {
+    //         TokenType.Dot, TokenType.Identifier => {
+    //             if (token == TokenType.Dot) _ = tokenReader.consume();
+    //             const invocationId = tokenReader.current();
+    //             handleArgList(tokenReader);
+    //             const invocation = Invocation{ .identifier = invocationId.Identifier.value };
+    //             _ = invocation;
+    //         },
+    //         TokenType.Comment => {},
+    //         else => {},
+    //     }
+    // }
 }
 
-fn handleTopLevel(tokenReader: TokenReader) void {
+fn handleInvocation(tokenReader: *TokenReader) void {
+    const nextToken = tokenReader.next();
+    if (nextToken != null and nextToken.? == TokenType.Identifier) {
+        _ = tokenReader.consume();
+        if (tokenReader.next() != null and tokenReader.next().? == TokenType.BracketOpen) {
+            _ = tokenReader.consume();
+            while (tokenReader.current() != TokenType.BlockClose) {
+                const token = tokenReader.consume();
+                switch (token) {
+                    TokenType.Identifier => {},
+                    TokenType.Comma => {},
+                    else => {
+                        std.debug.print("HADNLING IT", .{});
+                    },
+                }
+            }
+        }
+    } else {}
+}
+
+fn handleTopLevel(tokenReader: *TokenReader) void {
     while (tokenReader.consume()) |token| {
         switch (token) {
             TokenType.Dot => {
                 // Pragma
+                const nextToken = tokenReader.next();
+                if (nextToken != null and nextToken.? == TokenType.Identifier) {
+                    handleInvocation(tokenReader);
+                } else {}
             },
             TokenType.Identifier => {
-                const nextToken: TokenType = tokenReader.next();
-                if (nextToken == TokenType.Colon) {} else {}
+                // std.debug.print("IDENT\n", .{});
+                const nextToken = tokenReader.next();
+                if (nextToken != null and nextToken.? == TokenType.Colon) {
+                    _ = tokenReader.consume();
+                } else {}
             },
             TokenType.Comment => {},
             else => {},
@@ -101,7 +141,7 @@ fn handleTopLevel(tokenReader: TokenReader) void {
     }
 }
 
-pub fn toStatements(tokens: std.ArrayList(TokenUnion)) void {
-    const tokenReader = TokenReader{ .tokens = tokens.items };
-    handleTopLevel(tokenReader);
+pub fn toStatements(tokens: []TokenUnion) void {
+    var tokenReader = TokenReader{ .tokens = tokens };
+    handleTopLevel(&tokenReader);
 }
