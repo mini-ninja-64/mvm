@@ -1,7 +1,7 @@
 const std = @import("std");
 const MvmaSource = @import("./mvma.zig").MvmaSource;
 const tokenParser = @import("./token_parser.zig");
-const parser = @import("./parser.zig");
+const statementParser = @import("./statement_parser.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -27,8 +27,9 @@ pub fn main() !void {
     std.debug.print("Completed parsing\n", .{});
     defer tokens.clearAndFree();
 
-    var statements = try parser.toStatements(allocator, tokens.items);
-    _ = statements;
+    var statements = try statementParser.toStatements(allocator, tokens.items);
+    std.debug.print("Statements parsed successfully: {}\n", .{statements.successful()});
+    statements.errors.clearAndFree();
 
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {

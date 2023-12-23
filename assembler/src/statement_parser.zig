@@ -36,10 +36,15 @@ const Statement = union(StatementType) {
     InvokingStatement: InvokingStatement,
 };
 
+// Should be token pointer to show non owning?
 const ParserError = struct { token: ?TokenUnion = null, errorMessage: []const u8 };
 const ParseResult = struct {
     parsed: std.ArrayList(Statement),
     errors: std.ArrayList(ParserError),
+
+    pub fn successful(self: *ParseResult) bool {
+        return self.errors.items.len == 0;
+    }
 };
 
 const TokenReader = struct {
@@ -149,7 +154,6 @@ fn handleStatementsUntil(
 ) AllocatorError!std.ArrayList(Statement) {
     var statements = std.ArrayList(Statement).init(tokenReader.allocator);
     while (tokenReader.consume()) |token| {
-        // tokenParser.printToken(token);
         if (typeOfToken(token) == finalToken)
             return statements;
 
@@ -222,8 +226,6 @@ fn handleStatementsUntil(
     return statements;
 }
 
-//std.ArrayList(TopLevelStructure)
-//
 pub fn toStatements(allocator: std.mem.Allocator, tokens: []TokenUnion) !ParseResult {
     var filteredTokens = std.ArrayList(TokenUnion).init(allocator);
     defer filteredTokens.clearAndFree();
