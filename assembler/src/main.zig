@@ -27,11 +27,12 @@ pub fn main() !void {
     std.debug.print("Completed parsing\n", .{});
     defer tokens.clearAndFree();
 
-    var statements = parser.toStatements(tokens.items);
+    var statements = parser.toStatements(allocator, tokens.items);
     _ = statements;
 
+    // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {
-        tokenParser.printToken(token.*);
+        // tokenParser.printToken(token.*);
         switch (token.*) {
             .Address, .Identifier, .Comment => |*stringToken| {
                 stringToken.value.clearAndFree();
