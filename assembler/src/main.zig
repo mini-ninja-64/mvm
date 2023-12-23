@@ -27,7 +27,7 @@ pub fn main() !void {
     std.debug.print("Completed parsing\n", .{});
     defer tokens.clearAndFree();
 
-    var statements = parser.toStatements(allocator, tokens.items);
+    var statements = try parser.toStatements(allocator, tokens.items);
     _ = statements;
 
     // std.debug.print("------------All Tokens------------\n", .{});

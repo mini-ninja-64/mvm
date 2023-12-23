@@ -1,7 +1,21 @@
 const std = @import("std");
 const MvmaSource = @import("./mvma.zig").MvmaSource;
 
-pub const TokenType = enum { BlockOpen, BlockClose, BracketOpen, BracketClose, Dot, Colon, Identifier, Address, Number, Comment, Semicolon, Comma, EOF, Invalid };
+pub const TokenType = enum {
+    BlockOpen,
+    BlockClose,
+    BracketOpen,
+    BracketClose,
+    Dot,
+    Colon,
+    Identifier,
+    Address,
+    Number,
+    Comment,
+    Semicolon,
+    Comma,
+    Invalid,
+};
 pub fn Token(comptime T: type) type {
     if (T == void) return struct { value: void = {}, position: MvmaSource.FilePosition };
     return struct { value: T, position: MvmaSource.FilePosition };
@@ -19,7 +33,6 @@ pub const TokenUnion = union(TokenType) {
     Comment: Token(std.ArrayList(u8)),
     Semicolon: Token(void),
     Comma: Token(void),
-    EOF: Token(void),
     Invalid: Token([]const u8),
 };
 
@@ -115,6 +128,5 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
             else => try stringBuffer.append(char),
         }
     }
-    try tokens.append(TokenUnion{ .EOF = Token(void){ .position = source.currentPosition() } });
     return tokens;
 }

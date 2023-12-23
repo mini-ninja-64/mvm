@@ -27,7 +27,7 @@ const InvokingStatement = union(InvokingStatementType) {
 };
 const Block = struct {
     identifier: Identifier,
-    statements: std.ArrayList(InvokingStatement),
+    statements: std.ArrayList(Statement),
 };
 
 const StatementType = enum { Block, InvokingStatement };
@@ -36,14 +36,11 @@ const Statement = union(StatementType) {
     InvokingStatement: InvokingStatement,
 };
 
-const ParserError = struct {};
-pub fn Parseable(comptime T: type) type {
-    return struct {
-        valid: bool,
-        parsed: ?T = null,
-        errors: ?std.ArrayList(ParserError) = null,
-    };
-}
+const ParserError = struct { token: ?TokenUnion = null, errorMessage: []const u8 };
+const ParseResult = struct {
+    parsed: std.ArrayList(Statement),
+    errors: std.ArrayList(ParserError),
+};
 
 const TokenReader = struct {
     tokens: []TokenUnion,
@@ -80,30 +77,30 @@ const TokenReader = struct {
 };
 
 const IdentifierToken = std.meta.TagPayloadByName(TokenUnion, "Identifier");
+const AllocatorError = std.mem.Allocator.Error;
 
-fn handleBlock(identifier: IdentifierToken, tokenReader: *TokenReader) Parseable(Block) {
-    _ = identifier;
+fn handleBlock(identifier: IdentifierToken, tokenReader: *TokenReader, errors: *std.ArrayList(ParserError)) AllocatorError!?Block {
     const token = tokenReader.consume();
     if (typeOfToken(token) == TokenType.BlockOpen) {
-        handleStatementsUntil(tokenReader, TokenType.BlockClose);
-        return Parseable(Block){ .valid = true };
+        const blockStatements = try handleStatementsUntil(tokenReader, errors, TokenType.BlockClose);
+        return Block{ .identifier = identifier.value, .statements = blockStatements };
     } else {
-        return Parseable(Block){ .valid = false };
+        try errors.append(ParserError{ .token = token, .errorMessage = "Expected '{'" });
+        return null;
     }
 }
 
-fn handleDefiniteInvocation(tokenReader: *TokenReader) Parseable(Invocation) {
+fn handleDefiniteInvocation(tokenReader: *TokenReader, errors: *std.ArrayList(ParserError)) AllocatorError!?Invocation {
     if (typeOfToken(tokenReader.next()) != TokenType.Identifier) {
-        return Parseable(Invocation){ .valid = false };
+        try errors.append(ParserError{ .token = tokenReader.next(), .errorMessage = "Expected identifier" });
+        return null;
     }
 
-    return handleInvocation(tokenReader.consume().?.Identifier, tokenReader);
+    return handleInvocation(tokenReader.consume().?.Identifier, tokenReader, errors);
 }
 
-fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader) Parseable(Invocation) {
-    _ = identifier;
+fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, errors: *std.ArrayList(ParserError)) AllocatorError!?Invocation {
     var args = ArgList.init(tokenReader.allocator);
-    _ = args;
     if (typeOfToken(tokenReader.next()) == TokenType.BracketOpen) {
         _ = tokenReader.consume(); // Open bracket
         const InvocationPhase = enum { ArgComplete, ReadyForArg };
@@ -118,7 +115,7 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader) Pars
                     },
                     TokenType.BracketClose => break,
                     else => {
-                        std.debug.print("HADNLING IT 1\n", .{});
+                        try errors.append(ParserError{ .token = token, .errorMessage = "Invalid token in argument list, expected an argument or ')'" });
                         break;
                     },
                 }
@@ -127,15 +124,15 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader) Pars
                     TokenType.Comma => currentPhase = InvocationPhase.ReadyForArg,
                     TokenType.BracketClose => break,
                     else => {
-                        std.debug.print("HADNLING IT 2\n", .{});
+                        try errors.append(ParserError{ .token = token, .errorMessage = "Invalid token in argument list, expected ',' or ')'" });
                         break;
                     },
                 }
             }
         }
-        return Parseable(Invocation){ .valid = true };
+        return Invocation{ .identifier = identifier.value, .args = args };
     }
-    return Parseable(Invocation){ .valid = false };
+    return null;
 }
 
 fn typeOfToken(token: ?TokenUnion) ?TokenType {
@@ -145,79 +142,103 @@ fn typeOfToken(token: ?TokenUnion) ?TokenType {
     return null;
 }
 
-fn handleStatementsUntil(tokenReader: *TokenReader, tokenType: TokenType) void {
+fn handleStatementsUntil(
+    tokenReader: *TokenReader,
+    errors: *std.ArrayList(ParserError),
+    finalToken: ?TokenType,
+) AllocatorError!std.ArrayList(Statement) {
+    var statements = std.ArrayList(Statement).init(tokenReader.allocator);
     while (tokenReader.consume()) |token| {
-        tokenParser.printToken(token);
-        if (token == tokenType) return;
+        // tokenParser.printToken(token);
+        if (typeOfToken(token) == finalToken)
+            return statements;
 
-        switch (token) {
-            TokenType.Dot => {
-                const nextToken = tokenReader.next();
-                if (nextToken == null) {
-                    // TODO: ERROR EOF EARLY
-                    break;
-                }
-                switch (nextToken.?) {
-                    TokenType.Identifier => {
-                        std.debug.print("PRAGMA\n", .{});
-                        _ = handleDefiniteInvocation(tokenReader);
-                        if (typeOfToken(tokenReader.consume()) != TokenType.Semicolon) {
-                            // TODO: Error
-                            std.debug.print("Expected semicolon\n", .{});
-                        }
-                    },
-                    else => {
-                        // TODO: Error
-                        std.debug.print("ERROR 1\n", .{});
-                    },
-                }
-            },
-            TokenType.Identifier => |identifier| {
-                const nextToken = tokenReader.next();
-                if (nextToken == null) {
-                    // TODO: ERROR EOF EARLY
-                    break;
-                }
-                switch (nextToken.?) {
-                    TokenType.Colon => {
-                        std.debug.print("Block Start\n", .{});
-                        _ = tokenReader.consume(); // Skip colon
-                        _ = handleBlock(identifier, tokenReader);
-                    },
-                    TokenType.BracketOpen => {
-                        std.debug.print("Function execution\n", .{});
-                        _ = handleInvocation(identifier, tokenReader);
-                        if (typeOfToken(tokenReader.consume()) != TokenType.Semicolon) {
-                            // TODO: Error
-                            std.debug.print("Expected semicolon\n", .{});
-                        }
-                    },
-                    else => {
-                        // TODO: Error
-                        std.debug.print("ERROR 2\n", .{});
-                    },
-                }
-            },
-            else => {
-                // TODO: Error
-                std.debug.print("Invalid top level structure\n", .{});
-            },
+        if (tokenReader.next()) |nextToken| {
+            switch (token) {
+                TokenType.Dot => {
+                    switch (nextToken) {
+                        TokenType.Identifier => {
+                            if (try handleDefiniteInvocation(tokenReader, errors)) |invocation| {
+                                try statements.append(Statement{
+                                    .InvokingStatement = InvokingStatement{ .pragma = invocation },
+                                });
+                            }
+                            const expectedSemicolon = tokenReader.consume();
+                            if (typeOfToken(expectedSemicolon) != TokenType.Semicolon) {
+                                try errors.append(ParserError{
+                                    .token = expectedSemicolon,
+                                    .errorMessage = "Expected semicolon",
+                                });
+                            }
+                        },
+                        else => {
+                            try errors.append(ParserError{ .token = nextToken, .errorMessage = "Invalid token following '.'" });
+                        },
+                    }
+                },
+                TokenType.Identifier => |identifier| {
+                    switch (nextToken) {
+                        TokenType.Colon => {
+                            _ = tokenReader.consume(); // Skip colon
+                            if (try handleBlock(identifier, tokenReader, errors)) |block| {
+                                try statements.append(Statement{
+                                    .Block = block,
+                                });
+                            }
+                        },
+                        TokenType.BracketOpen => {
+                            if (try handleInvocation(identifier, tokenReader, errors)) |invocation| {
+                                try statements.append(Statement{
+                                    .InvokingStatement = InvokingStatement{ .invocation = invocation },
+                                });
+                            }
+
+                            const expectedSemicolon = tokenReader.consume();
+                            if (typeOfToken(expectedSemicolon) != TokenType.Semicolon) {
+                                try errors.append(ParserError{
+                                    .token = expectedSemicolon,
+                                    .errorMessage = "Expected semicolon",
+                                });
+                            }
+                        },
+                        else => {
+                            try errors.append(ParserError{ .token = nextToken, .errorMessage = "Invalid token following identifier" });
+                        },
+                    }
+                },
+                else => {
+                    try errors.append(ParserError{ .token = token, .errorMessage = "Invalid top level structure" });
+                },
+            }
+        } else {
+            try errors.append(ParserError{
+                .errorMessage = "Unexpected EOF",
+            });
         }
     }
-    // TODO: error
-    std.debug.print("Ended before expected\n", .{});
+    if (finalToken != null) {
+        try errors.append(ParserError{ .token = null, .errorMessage = "Unexpected EOF" });
+    }
+    return statements;
 }
 
 //std.ArrayList(TopLevelStructure)
-pub fn toStatements(allocator: std.mem.Allocator, tokens: []TokenUnion) void {
+//
+pub fn toStatements(allocator: std.mem.Allocator, tokens: []TokenUnion) !ParseResult {
     var filteredTokens = std.ArrayList(TokenUnion).init(allocator);
     defer filteredTokens.clearAndFree();
+
+    var errors = std.ArrayList(ParserError).init(allocator);
+
     for (tokens) |token| {
         if (typeOfToken(token) != TokenType.Comment) {
-            // TODO: Handle properly
-            filteredTokens.append(token) catch {};
+            try filteredTokens.append(token);
         }
     }
     var tokenReader = TokenReader{ .tokens = filteredTokens.items, .allocator = allocator };
-    handleStatementsUntil(&tokenReader, TokenType.EOF);
+    const statements = try handleStatementsUntil(&tokenReader, &errors, null);
+    return ParseResult{
+        .parsed = statements,
+        .errors = errors,
+    };
 }
