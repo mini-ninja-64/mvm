@@ -28,12 +28,25 @@ pub fn main() !void {
     defer tokens.clearAndFree();
 
     var statements = try statementParser.toStatements(allocator, tokens.items);
-    std.debug.print("Statements parsed successfully: {}\n", .{statements.successful()});
-    statements.errors.clearAndFree();
+    defer statements.clearAndFree();
+    if (!statements.successful()) {
+        std.debug.print("Parsing failed!!!\n", .{});
+        for (statements.errors.items) |parserError| {
+            if (parserError.token) |token| {
+                std.debug.print("{s} @ {}:{}\n", .{
+                    parserError.errorMessage,
+                    token.getCommon().position.line,
+                    token.getCommon().position.column,
+                });
+            } else {
+                std.debug.print("{s}\n", .{parserError.errorMessage});
+            }
+        }
+    }
 
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {
-        // tokenParser.printToken(token.*);
+        tokenParser.printToken(token.*);
         switch (token.*) {
             .Address, .Identifier, .Comment => |*stringToken| {
                 stringToken.value.clearAndFree();

@@ -34,6 +34,26 @@ pub const TokenUnion = union(TokenType) {
     Semicolon: Token(void),
     Comma: Token(void),
     Invalid: Token([]const u8),
+
+    pub fn getCommon(self: *const TokenUnion) Token(void) {
+        return switch (self.*) {
+            TokenType.BlockOpen,
+            TokenType.BlockClose,
+            TokenType.BracketOpen,
+            TokenType.BracketClose,
+            TokenType.Dot,
+            TokenType.Colon,
+            TokenType.Semicolon,
+            TokenType.Comma,
+            => |t| t,
+            TokenType.Identifier,
+            TokenType.Address,
+            TokenType.Comment,
+            => |t| Token(void){ .position = t.position },
+            TokenType.Invalid => |t| Token(void){ .position = t.position },
+            TokenType.Number => |t| Token(void){ .position = t.position },
+        };
+    }
 };
 
 pub fn printToken(token: TokenUnion) void {

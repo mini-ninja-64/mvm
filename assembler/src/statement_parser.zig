@@ -1,49 +1,95 @@
 const std = @import("std");
-const tokenParser = @import("./token_parser.zig");
-const TokenType = tokenParser.TokenType;
-const TokenUnion = tokenParser.TokenUnion;
+const MvmaSource = @import("./mvma.zig").MvmaSource;
+const TokenParser = @import("./token_parser.zig");
+const TokenType = TokenParser.TokenType;
+const TokenUnion = TokenParser.TokenUnion;
 
 const Number = u32;
-const Identifier = std.ArrayList(u8);
-const Address = std.ArrayList(u8);
+const Identifier = []const u8;
+const Address = []const u8;
 
-const ArgType = enum { identifier, number, address };
+const ArgType = enum { Identifier, Number, Address };
 const Arg = union(ArgType) {
-    identifier: Identifier,
-    number: Number,
-    address: Address,
+    Identifier: Identifier,
+    Number: Number,
+    Address: Address,
+
+    fn dealloc(self: *Arg) void {
+        switch (self.*) {
+            ArgType.Identifier => {},
+            ArgType.Number => {},
+            ArgType.Address => {},
+        }
+    }
 };
 const ArgList = std.ArrayList(Arg);
 
 const Invocation = struct {
     identifier: Identifier,
     args: ArgList,
+    fn dealloc(self: *Invocation) void {
+        for (self.args.items) |*arg| {
+            arg.dealloc();
+        }
+        self.args.clearAndFree();
+    }
 };
 const Pragma = Invocation;
-const InvokingStatementType = enum { pragma, invocation };
+const InvokingStatementType = enum { Pragma, Function };
 const InvokingStatement = union(InvokingStatementType) {
-    pragma: Pragma,
-    invocation: Invocation,
+    Pragma: Pragma,
+    Function: Invocation,
+
+    fn dealloc(self: *InvokingStatement) void {
+        switch (self.*) {
+            InvokingStatementType.Pragma => |*pragma| pragma.dealloc(),
+            InvokingStatementType.Function => |*invokingStatement| invokingStatement.dealloc(),
+        }
+    }
 };
 const Block = struct {
     identifier: Identifier,
     statements: std.ArrayList(Statement),
+
+    fn dealloc(self: *Block) void {
+        for (self.statements.items) |*statement| {
+            statement.dealloc();
+        }
+        self.statements.clearAndFree();
+    }
 };
 
 const StatementType = enum { Block, InvokingStatement };
 const Statement = union(StatementType) {
     Block: Block,
     InvokingStatement: InvokingStatement,
+
+    fn dealloc(self: *Statement) void {
+        switch (self.*) {
+            StatementType.Block => |*block| block.dealloc(),
+            StatementType.InvokingStatement => |*invokingStatement| invokingStatement.dealloc(),
+        }
+    }
 };
 
-// Should be token pointer to show non owning?
-const ParserError = struct { token: ?TokenUnion = null, errorMessage: []const u8 };
+const ParserError = struct {
+    token: ?TokenUnion = null,
+    errorMessage: []const u8,
+};
 const ParseResult = struct {
     parsed: std.ArrayList(Statement),
     errors: std.ArrayList(ParserError),
 
     pub fn successful(self: *ParseResult) bool {
         return self.errors.items.len == 0;
+    }
+
+    pub fn clearAndFree(self: *ParseResult) void {
+        self.errors.clearAndFree();
+        for (self.parsed.items) |*statement| {
+            statement.dealloc();
+        }
+        self.parsed.clearAndFree();
     }
 };
 
@@ -88,16 +134,22 @@ fn handleBlock(identifier: IdentifierToken, tokenReader: *TokenReader, errors: *
     const token = tokenReader.consume();
     if (typeOfToken(token) == TokenType.BlockOpen) {
         const blockStatements = try handleStatementsUntil(tokenReader, errors, TokenType.BlockClose);
-        return Block{ .identifier = identifier.value, .statements = blockStatements };
+        return Block{ .identifier = identifier.value.items, .statements = blockStatements };
     } else {
-        try errors.append(ParserError{ .token = token, .errorMessage = "Expected '{'" });
+        try errors.append(ParserError{
+            .token = token,
+            .errorMessage = "Expected '{'",
+        });
         return null;
     }
 }
 
 fn handleDefiniteInvocation(tokenReader: *TokenReader, errors: *std.ArrayList(ParserError)) AllocatorError!?Invocation {
     if (typeOfToken(tokenReader.next()) != TokenType.Identifier) {
-        try errors.append(ParserError{ .token = tokenReader.next(), .errorMessage = "Expected identifier" });
+        try errors.append(ParserError{
+            .token = tokenReader.next(),
+            .errorMessage = "Expected identifier",
+        });
         return null;
     }
 
@@ -120,7 +172,10 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
                     },
                     TokenType.BracketClose => break,
                     else => {
-                        try errors.append(ParserError{ .token = token, .errorMessage = "Invalid token in argument list, expected an argument or ')'" });
+                        try errors.append(ParserError{
+                            .token = token,
+                            .errorMessage = "Invalid token in argument list, expected an argument or ')'",
+                        });
                         break;
                     },
                 }
@@ -129,13 +184,16 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
                     TokenType.Comma => currentPhase = InvocationPhase.ReadyForArg,
                     TokenType.BracketClose => break,
                     else => {
-                        try errors.append(ParserError{ .token = token, .errorMessage = "Invalid token in argument list, expected ',' or ')'" });
+                        try errors.append(ParserError{
+                            .token = token,
+                            .errorMessage = "Invalid token in argument list, expected ',' or ')'",
+                        });
                         break;
                     },
                 }
             }
         }
-        return Invocation{ .identifier = identifier.value, .args = args };
+        return Invocation{ .identifier = identifier.value.items, .args = args };
     }
     return null;
 }
@@ -164,7 +222,7 @@ fn handleStatementsUntil(
                         TokenType.Identifier => {
                             if (try handleDefiniteInvocation(tokenReader, errors)) |invocation| {
                                 try statements.append(Statement{
-                                    .InvokingStatement = InvokingStatement{ .pragma = invocation },
+                                    .InvokingStatement = InvokingStatement{ .Pragma = invocation },
                                 });
                             }
                             const expectedSemicolon = tokenReader.consume();
@@ -176,7 +234,10 @@ fn handleStatementsUntil(
                             }
                         },
                         else => {
-                            try errors.append(ParserError{ .token = nextToken, .errorMessage = "Invalid token following '.'" });
+                            try errors.append(ParserError{
+                                .token = nextToken,
+                                .errorMessage = "Invalid token following '.'",
+                            });
                         },
                     }
                 },
@@ -191,9 +252,9 @@ fn handleStatementsUntil(
                             }
                         },
                         TokenType.BracketOpen => {
-                            if (try handleInvocation(identifier, tokenReader, errors)) |invocation| {
+                            if (try handleInvocation(identifier, tokenReader, errors)) |function| {
                                 try statements.append(Statement{
-                                    .InvokingStatement = InvokingStatement{ .invocation = invocation },
+                                    .InvokingStatement = InvokingStatement{ .Function = function },
                                 });
                             }
 
@@ -206,12 +267,18 @@ fn handleStatementsUntil(
                             }
                         },
                         else => {
-                            try errors.append(ParserError{ .token = nextToken, .errorMessage = "Invalid token following identifier" });
+                            try errors.append(ParserError{
+                                .token = nextToken,
+                                .errorMessage = "Invalid token following identifier",
+                            });
                         },
                     }
                 },
                 else => {
-                    try errors.append(ParserError{ .token = token, .errorMessage = "Invalid top level structure" });
+                    try errors.append(ParserError{
+                        .token = token,
+                        .errorMessage = "Invalid top level structure",
+                    });
                 },
             }
         } else {
@@ -221,7 +288,9 @@ fn handleStatementsUntil(
         }
     }
     if (finalToken != null) {
-        try errors.append(ParserError{ .token = null, .errorMessage = "Unexpected EOF" });
+        try errors.append(ParserError{
+            .errorMessage = "Unexpected EOF",
+        });
     }
     return statements;
 }
