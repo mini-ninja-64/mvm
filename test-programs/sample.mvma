@@ -1,4 +1,4 @@
-.ENTRYPOINT(MAIN);
+.ENTRYPOINT($MAIN);
 
 MULTIPLY: {
     // r0 = A
@@ -17,7 +17,7 @@ MULTIPLY: {
 
         Add(r3, r3, r0);
         SubtractConstant(r2, #1);
-        BranchAlways(r5);
+        BranchAlways(#0b00, r5);
     }
 }
 

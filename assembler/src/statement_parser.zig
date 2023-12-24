@@ -4,30 +4,28 @@ const TokenParser = @import("./token_parser.zig");
 const TokenType = TokenParser.TokenType;
 const TokenUnion = TokenParser.TokenUnion;
 
-const Number = u32;
-const Identifier = []const u8;
-const Address = []const u8;
-const Register = struct { index: u8 };
+pub const Number = usize;
+pub const Identifier = []const u8;
+pub const Address = []const u8;
+pub const Register = struct { index: u8 };
 
-const ArgType = enum { Register, Number, Address, Identifier };
-const Arg = union(ArgType) {
+pub const ArgType = enum { Register, Number, Address };
+pub const Arg = union(ArgType) {
     Register: Register,
     Number: Number,
     Address: Address,
-    Identifier: Identifier,
 
     fn dealloc(self: *Arg) void {
         switch (self.*) {
             ArgType.Register => {},
             ArgType.Number => {},
             ArgType.Address => {},
-            ArgType.Identifier => {},
         }
     }
 };
-const ArgList = std.ArrayList(Arg);
+pub const ArgList = std.ArrayList(Arg);
 
-const Invocation = struct {
+pub const Invocation = struct {
     identifier: Identifier,
     args: ArgList,
     fn dealloc(self: *Invocation) void {
@@ -37,9 +35,9 @@ const Invocation = struct {
         self.args.clearAndFree();
     }
 };
-const Pragma = Invocation;
-const InvokingStatementType = enum { Pragma, Function };
-const InvokingStatement = union(InvokingStatementType) {
+pub const Pragma = Invocation;
+pub const InvokingStatementType = enum { Pragma, Function };
+pub const InvokingStatement = union(InvokingStatementType) {
     Pragma: Pragma,
     Function: Invocation,
 
@@ -50,7 +48,7 @@ const InvokingStatement = union(InvokingStatementType) {
         }
     }
 };
-const Block = struct {
+pub const Block = struct {
     identifier: Identifier,
     statements: std.ArrayList(Statement),
 
@@ -62,8 +60,8 @@ const Block = struct {
     }
 };
 
-const StatementType = enum { Block, InvokingStatement };
-const Statement = union(StatementType) {
+pub const StatementType = enum { Block, InvokingStatement };
+pub const Statement = union(StatementType) {
     Block: Block,
     InvokingStatement: InvokingStatement,
 
@@ -197,7 +195,10 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
                                 if (REGISTER_LUT.get(identifierToken.value.items)) |register| {
                                     try args.append(Arg{ .Register = register });
                                 } else {
-                                    try args.append(Arg{ .Identifier = identifierToken.value.items });
+                                    try errors.append(ParserError{
+                                        .token = token,
+                                        .errorMessage = "Unrecognised type in argument list",
+                                    });
                                 }
                             },
                             TokenType.Address => |addressToken| try args.append(Arg{ .Address = addressToken.value.items }),

@@ -43,26 +43,26 @@ An MVM CPU has 16*32 bit registers
 | 10         | Xor(Rx, Ry, Rz)                               | 0b1010         | OPCODE[4] Rx[4] Ry[4] Rz[4]      | Rx = Ry^Rz          |
 |            |                                               |                |                                  |                     |
 | 8 bit ops  |                                               |                |                                  |                     |
-| 11         | CopyRegister(Rx, Ry)                          | 0b1110 0000    | OPCODE[8] Rx[4] Ry[4]            | Rx = Ry             |
-| 12         | CopyFromAddress(Rx, Ry)                       | 0b1110 0001    | OPCODE[8] Rx[4] Ry[4]            | Rx = *Ry            |
-| 13         | CopyToAddress(Rx, Ry)                         | 0b1110 0010    | OPCODE[8] Rx[4] Ry[4]            | *Ry = Rx            |
-| 14         | CopyHalfWordFromAddress(Rx, Ry)               | 0b1110 0011    | OPCODE[8] Rx[4] Ry[4]            | Rx = (*Ry & 0xFFFF) |
-| 15         | CoyHalfWordToAddress(Rx, Ry)                  | 0b1110 0100    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (Rx & 0xFFFF) |
-| 16         | CoyByteFromAddress(Rx, Ry)                    | 0b1110 0101    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (\*Rx & 0xFF) |
-| 17         | CoyByteToAddress(Rx, Ry)                      | 0b1110 0110    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (Rx & 0xFF)   |
+| 11         | CopyRegister(Rx, Ry)                          | 0b1110_0000    | OPCODE[8] Rx[4] Ry[4]            | Rx = Ry             |
+| 12         | CopyFromAddress(Rx, Ry)                       | 0b1110_0001    | OPCODE[8] Rx[4] Ry[4]            | Rx = *Ry            |
+| 13         | CopyToAddress(Rx, Ry)                         | 0b1110_0010    | OPCODE[8] Rx[4] Ry[4]            | *Ry = Rx            |
+| 14         | CopyHalfWordFromAddress(Rx, Ry)               | 0b1110_0011    | OPCODE[8] Rx[4] Ry[4]            | Rx = (*Ry & 0xFFFF) |
+| 15         | CopyHalfWordToAddress(Rx, Ry)                 | 0b1110_0100    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (Rx & 0xFFFF) |
+| 16         | CopyByteFromAddress(Rx, Ry)                   | 0b1110_0101    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (\*Rx & 0xFF) |
+| 17         | CopyByteToAddress(Rx, Ry)                     | 0b1110_0110    | OPCODE[8] Rx[4] Ry[4]            | *Ry = (Rx & 0xFF)   |
 |            |                                               |                |                                  |                     |
-| 18         | Compare(Rx, Ry)                               | 0b1110 0111    | OPCODE[8] Rx[4] Ry[4]            | Rx - Ry             |
+| 18         | Compare(Rx, Ry)                               | 0b1110_0111    | OPCODE[8] Rx[4] Ry[4]            | Rx - Ry             |
 |            |                                               |                |                                  |                     |
 | 10 bit ops |                                               |                |                                  |                     |
-| 19         | BranchAlways(BranchConfig, Rx)                | 0b1111 00 0000 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
-| 20         | BranchEqual(BranchConfig, Rx)                 | 0b1111 00 0001 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
-| 21         | BranchNotEqual(BranchConfig, Rx)              | 0b1111 00 0010 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 19         | BranchAlways(BranchConfig, Rx)                | 0b1111_00_0000 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 20         | BranchEqual(BranchConfig, Rx)                 | 0b1111_00_0001 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 21         | BranchNotEqual(BranchConfig, Rx)              | 0b1111_00_0010 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 |            |                                               |                |                                  |                     |
-| 22         | BranchGreaterThan(BranchConfig, Rx)           | 0b1111 00 0011 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
-| 23         | BranchGreaterThanEqual(BranchConfig, Rx)      | 0b1111 00 0100 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 22         | BranchGreaterThan(BranchConfig, Rx)           | 0b1111_00_0011 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 23         | BranchGreaterThanEqual(BranchConfig, Rx)      | 0b1111_00_0100 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 |            |                                               |                |                                  |                     |
-| 24         | BranchLessThan(BranchConfig, Rx)              | 0b1111 00 0101 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
-| 25         | BranchLessThanEqual(BranchConfig, Rx)         | 0b1111 00 0110 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 24         | BranchLessThan(BranchConfig, Rx)              | 0b1111_00_0101 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
+| 25         | BranchLessThanEqual(BranchConfig, Rx)         | 0b1111_00_0110 | OPCODE[10] BranchConfig[2] Rx[4] |                     |
 
 ### Args
 

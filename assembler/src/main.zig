@@ -2,6 +2,7 @@ const std = @import("std");
 const MvmaSource = @import("./mvma.zig").MvmaSource;
 const tokenParser = @import("./token_parser.zig");
 const statementParser = @import("./statement_parser.zig");
+const bytecodeGenerator = @import("./bytecode_generator.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -43,9 +44,7 @@ pub fn main() !void {
             }
         }
     } else {
-        for (statements.parsed.items) |statement| {
-            std.debug.print("{}\n", .{statement});
-        }
+        _ = try bytecodeGenerator.generateBytecode(allocator, statements.parsed.items);
     }
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {
