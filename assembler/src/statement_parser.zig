@@ -7,18 +7,21 @@ const TokenUnion = TokenParser.TokenUnion;
 const Number = u32;
 const Identifier = []const u8;
 const Address = []const u8;
+const Register = struct { index: u8 };
 
-const ArgType = enum { Identifier, Number, Address };
+const ArgType = enum { Register, Number, Address, Identifier };
 const Arg = union(ArgType) {
-    Identifier: Identifier,
+    Register: Register,
     Number: Number,
     Address: Address,
+    Identifier: Identifier,
 
     fn dealloc(self: *Arg) void {
         switch (self.*) {
-            ArgType.Identifier => {},
+            ArgType.Register => {},
             ArgType.Number => {},
             ArgType.Address => {},
+            ArgType.Identifier => {},
         }
     }
 };
@@ -156,6 +159,25 @@ fn handleDefiniteInvocation(tokenReader: *TokenReader, errors: *std.ArrayList(Pa
     return handleInvocation(tokenReader.consume().?.Identifier, tokenReader, errors);
 }
 
+const REGISTER_LUT = std.ComptimeStringMap(Register, .{
+    .{ "r0", Register{ .index = 0 } },
+    .{ "r1", Register{ .index = 1 } },
+    .{ "r2", Register{ .index = 2 } },
+    .{ "r3", Register{ .index = 3 } },
+    .{ "r4", Register{ .index = 4 } },
+    .{ "r5", Register{ .index = 5 } },
+    .{ "r6", Register{ .index = 6 } },
+    .{ "r7", Register{ .index = 7 } },
+    .{ "r8", Register{ .index = 8 } },
+    .{ "r9", Register{ .index = 9 } },
+    .{ "r10", Register{ .index = 10 } },
+    .{ "r11", Register{ .index = 11 } },
+    .{ "status", Register{ .index = 12 } },
+    .{ "sp", Register{ .index = 13 } },
+    .{ "lr", Register{ .index = 14 } },
+    .{ "pc", Register{ .index = 15 } },
+});
+
 fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, errors: *std.ArrayList(ParserError)) AllocatorError!?Invocation {
     var args = ArgList.init(tokenReader.allocator);
     if (typeOfToken(tokenReader.next()) == TokenType.BracketOpen) {
@@ -168,6 +190,20 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
                     TokenType.Identifier, TokenType.Address, TokenType.Number => {
                         // identifier.value;
                         // TODO: do args
+                        const arg: Arg = undefined;
+                        _ = arg;
+                        switch (token) {
+                            TokenType.Identifier => |identifierToken| {
+                                if (REGISTER_LUT.get(identifierToken.value.items)) |register| {
+                                    try args.append(Arg{ .Register = register });
+                                } else {
+                                    try args.append(Arg{ .Identifier = identifierToken.value.items });
+                                }
+                            },
+                            TokenType.Address => |addressToken| try args.append(Arg{ .Address = addressToken.value.items }),
+                            TokenType.Number => |numberToken| try args.append(Arg{ .Number = numberToken.value }),
+                            else => unreachable,
+                        }
                         currentPhase = InvocationPhase.ArgComplete;
                     },
                     TokenType.BracketClose => break,
@@ -277,7 +313,7 @@ fn handleStatementsUntil(
                 else => {
                     try errors.append(ParserError{
                         .token = token,
-                        .errorMessage = "Invalid top level structure",
+                        .errorMessage = "Invalid token found",
                     });
                 },
             }

@@ -3,7 +3,6 @@
 MULTIPLY: {
     // r0 = A
     // r1 = B
-    
     // r2 is copy of B and will be decremented
     // r3 is the result of multiplication
     // r4 is zeroed out for reference
@@ -14,7 +13,7 @@ MULTIPLY: {
     WriteConstant(r5, $MULTIPLY_LOOP);
     MULTIPLY_LOOP: {
         Compare(r3, r4);
-        BranchEqual(#0b00, LR);
+        BranchEqual(#0b00, lr);
 
         Add(r3, r3, r0);
         SubtractConstant(r2, #1);

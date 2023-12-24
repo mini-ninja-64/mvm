@@ -42,11 +42,13 @@ pub fn main() !void {
                 std.debug.print("{s}\n", .{parserError.errorMessage});
             }
         }
+    } else {
+        for (statements.parsed.items) |statement| {
+            std.debug.print("{}\n", .{statement});
+        }
     }
-
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {
-        tokenParser.printToken(token.*);
         switch (token.*) {
             .Address, .Identifier, .Comment => |*stringToken| {
                 stringToken.value.clearAndFree();
