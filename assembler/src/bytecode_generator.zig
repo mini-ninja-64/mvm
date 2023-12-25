@@ -35,6 +35,28 @@ const Operation = struct {
     const Arg = union(ArgType) {
         Value: Value,
         LazyValue: LazyValue,
+
+        pub fn getValue(self: *const Arg, addressHandler: *AddressHandler) ?Value {
+            switch (self.*) {
+                Operation.ArgType.Value => |value| return value,
+                Operation.ArgType.LazyValue => |lazyValue| {
+                    // TODO: should probably proxy size
+                    if (addressHandler.get(lazyValue)) |address| {
+                        return Operation.Value{
+                            .value = @truncate(address),
+                            .size = 8,
+                        };
+                    } else {
+                        var iter = addressHandler.addresses.valueIterator();
+                        while (iter.next()) |v| {
+                            std.debug.print("item: '{s}'\n", .{v.items});
+                        }
+                        std.debug.print("couldnt be found '{s}'\n", .{lazyValue});
+                        return null;
+                    }
+                },
+            }
+        }
     };
     opcode: u16,
     opcodeSize: u4,
@@ -221,12 +243,13 @@ const BinaryStream = struct {
     addressHandler: AddressHandler,
     allocator: std.mem.Allocator,
 
-    fn handlePragma(self: *BinaryStream, invocation: StatementParser.Invocation) !void {
+    fn handlePragma(self: *BinaryStream, invocation: StatementParser.Invocation, blockName: []const u8) !void {
         _ = self;
         _ = invocation;
+        _ = blockName;
     }
 
-    fn handleFunction(self: *BinaryStream, invocation: StatementParser.Invocation) !void {
+    fn handleFunction(self: *BinaryStream, invocation: StatementParser.Invocation, blockName: []const u8) !void {
         if (FUNCTION_LUT.get(invocation.identifier)) |functionDefinition| {
             const validators = functionDefinition.validators;
             const argSizes = functionDefinition.argSizes;
@@ -249,7 +272,7 @@ const BinaryStream = struct {
                                 .value = @truncate(number),
                             } },
                             StatementParser.ArgType.Address => |address| Operation.Arg{
-                                .LazyValue = address,
+                                .LazyValue = try self.addressHandler.registerAddressReference(blockName, address),
                             },
                         };
                         try args.append(opArg);
@@ -265,7 +288,6 @@ const BinaryStream = struct {
                     .opcodeSize = functionDefinition.opcodeSize,
                     .args = args,
                 });
-                // std.debug.print("op: {b:16}\n", .{opBinary | argsBinary});
             } else {
                 std.debug.print("Too few args: {s}\n", .{invocation.identifier});
             }
@@ -277,8 +299,8 @@ const BinaryStream = struct {
             switch (statement) {
                 StatementParser.StatementType.InvokingStatement => |invokingStatement| {
                     switch (invokingStatement) {
-                        StatementParser.InvokingStatementType.Function => |invocation| try self.handleFunction(invocation),
-                        StatementParser.InvokingStatementType.Pragma => |invocation| try self.handlePragma(invocation),
+                        StatementParser.InvokingStatementType.Function => |invocation| try self.handleFunction(invocation, blockName),
+                        StatementParser.InvokingStatementType.Pragma => |invocation| try self.handlePragma(invocation, blockName),
                     }
                 },
                 StatementParser.StatementType.Block => |block| {
@@ -287,6 +309,31 @@ const BinaryStream = struct {
                 },
             }
         }
+    }
+
+    pub fn toBinary(self: *BinaryStream) !std.ArrayList(u8) {
+        var bytecode = std.ArrayList(u8).init(self.allocator);
+        for (self.operations.items) |operation| {
+            const binaryShift: u16 = @as(u16, 16 - @as(u16, operation.opcodeSize));
+            var opBinary = operation.opcode << @truncate(binaryShift);
+            var argsBinary: u16 = 0;
+            var argPosition: u8 = operation.opcodeSize;
+            for (operation.args.items) |arg| {
+                const argValue = arg.getValue(&self.addressHandler);
+                var argBinaryValue: u16 = argValue.?.value;
+                argPosition += argValue.?.size;
+                const shiftValue = @as(u16, 16 - argPosition);
+                argBinaryValue <<= @truncate(shiftValue);
+                argsBinary |= argBinaryValue;
+            }
+            opBinary |= argsBinary;
+
+            std.debug.print("op: {b:16}\n", .{opBinary});
+
+            try bytecode.append(@truncate((opBinary & 0xFF00) >> 8));
+            try bytecode.append(@truncate(opBinary & 0x00FF));
+        }
+        return bytecode;
     }
 
     fn clearAndFree(self: *BinaryStream) void {
@@ -341,6 +388,11 @@ const AddressHandler = struct {
         return addressName;
     }
 
+    pub fn get(self: *AddressHandler, address: []const u8) ?usize {
+        std.debug.print("fetching addr: {s}\n", .{address});
+        return self.addressLookup.get(address);
+    }
+
     pub fn clearAndFree(self: *AddressHandler) void {
         self.addressLookup.clearAndFree();
         var addresses = self.addresses.valueIterator();
@@ -360,7 +412,8 @@ pub fn generateBytecode(allocator: std.mem.Allocator, statements: []StatementPar
     };
     defer bs.clearAndFree();
     try bs.handleBytecode(statements, "");
-
+    var bytes = try bs.toBinary();
+    defer bytes.clearAndFree();
     // return Binary{
     //     .metadata = metadata,
     //     .bytecode = bytes,
