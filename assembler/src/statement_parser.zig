@@ -186,10 +186,6 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
             if (currentPhase == InvocationPhase.ReadyForArg) {
                 switch (token) {
                     TokenType.Identifier, TokenType.Address, TokenType.Number => {
-                        // identifier.value;
-                        // TODO: do args
-                        const arg: Arg = undefined;
-                        _ = arg;
                         switch (token) {
                             TokenType.Identifier => |identifierToken| {
                                 if (REGISTER_LUT.get(identifierToken.value.items)) |register| {

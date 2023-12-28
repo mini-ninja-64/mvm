@@ -35,6 +35,7 @@ pub fn main() !void {
         };
 
         // try waitForInput();
+        // printRegisters(&mvmCpu);
     }
 
     printRegisters(&mvmCpu);

@@ -1,5 +1,12 @@
 .ENTRYPOINT($MAIN);
 
+MAIN: {
+    WriteConstant(r0, #2);
+    WriteConstant(r1, #3);
+    WriteConstant(r11, $MULTIPLY);
+    BranchAlways(#0b01, r11);
+}
+
 MULTIPLY: {
     // r0 = A
     // r1 = B
@@ -10,7 +17,7 @@ MULTIPLY: {
     Subtract(r3, r3, r3); // Zero out r3
     Subtract(r4, r4, r4); // Zero out r4
     CopyRegister(r2, r1); // r2 = r1
-    WriteConstant(r5, $MULTIPLY_LOOP);
+    WriteConstant(r5, $.MULTIPLY_LOOP);
     MULTIPLY_LOOP: {
         Compare(r3, r4);
         BranchEqual(#0b00, lr);
@@ -19,11 +26,4 @@ MULTIPLY: {
         SubtractConstant(r2, #1);
         BranchAlways(#0b00, r5);
     }
-}
-
-MAIN: {
-    WriteConstant(r0, #2);
-    WriteConstant(r1, #3);
-    WriteConstant(r11, $MULTIPLY);
-    BranchAlways(#0b01, r11);
 }

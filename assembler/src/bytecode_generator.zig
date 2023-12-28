@@ -40,18 +40,14 @@ const Operation = struct {
             switch (self.*) {
                 Operation.ArgType.Value => |value| return value,
                 Operation.ArgType.LazyValue => |lazyValue| {
-                    // TODO: should probably proxy size
+                    // TODO: should probably proxy size instead of hardcoding
+                    //       and then do error reporting if too big
                     if (addressHandler.get(lazyValue)) |address| {
                         return Operation.Value{
                             .value = @truncate(address),
                             .size = 8,
                         };
                     } else {
-                        var iter = addressHandler.addresses.valueIterator();
-                        while (iter.next()) |v| {
-                            std.debug.print("item: '{s}'\n", .{v.items});
-                        }
-                        std.debug.print("couldnt be found '{s}'\n", .{lazyValue});
                         return null;
                     }
                 },
@@ -271,8 +267,13 @@ const BinaryStream = struct {
                                 .size = argSize,
                                 .value = @truncate(number),
                             } },
-                            StatementParser.ArgType.Address => |address| Operation.Arg{
-                                .LazyValue = try self.addressHandler.registerAddressReference(blockName, address),
+                            StatementParser.ArgType.Address => |address| operation: {
+                                const localAddress = std.mem.startsWith(u8, address, ".");
+                                const currentBlock = if (localAddress) blockName else "";
+                                const normalisedAddress = if (localAddress) address[1..address.len] else address;
+                                break :operation Operation.Arg{
+                                    .LazyValue = try self.addressHandler.registerAddressReference(currentBlock, normalisedAddress),
+                                };
                             },
                         };
                         try args.append(opArg);
@@ -304,7 +305,7 @@ const BinaryStream = struct {
                     }
                 },
                 StatementParser.StatementType.Block => |block| {
-                    const newBlockName = try self.addressHandler.add(blockName, block.identifier, self.operations.items.len);
+                    const newBlockName = try self.addressHandler.add(blockName, block.identifier, self.operations.items.len * 2);
                     try self.handleBytecode(block.statements.items, newBlockName);
                 },
             }
@@ -367,7 +368,7 @@ const AddressHandler = struct {
     pub fn registerAddressReference(self: *AddressHandler, prefix: []const u8, name: []const u8) ![]const u8 {
         var addressName = std.ArrayList(u8).init(self.allocator);
         try addressName.appendSlice(prefix);
-        try addressName.append(':');
+        try addressName.append('.');
         try addressName.appendSlice(name);
 
         if (self.addresses.get(addressName.items)) |address| {
@@ -389,7 +390,6 @@ const AddressHandler = struct {
     }
 
     pub fn get(self: *AddressHandler, address: []const u8) ?usize {
-        std.debug.print("fetching addr: {s}\n", .{address});
         return self.addressLookup.get(address);
     }
 

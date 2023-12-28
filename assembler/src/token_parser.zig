@@ -145,6 +145,12 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
 
             ' ', '\n', '\t' => {},
 
+            '$' => {
+                //TODO: Addresses with nested dots will not work, need to fix this hack
+                try stringBuffer.append('$');
+                if (source.peekNext() == '.') try stringBuffer.append(source.consumeNext().?);
+            },
+
             else => try stringBuffer.append(char),
         }
     }

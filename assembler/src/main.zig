@@ -48,6 +48,7 @@ pub fn main() !void {
     }
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {
+        // tokenParser.printToken(token.*);
         switch (token.*) {
             .Address, .Identifier, .Comment => |*stringToken| {
                 stringToken.value.clearAndFree();
