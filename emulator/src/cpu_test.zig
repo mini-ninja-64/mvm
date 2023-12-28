@@ -520,6 +520,7 @@ fn testBranch(testConfig: BranchTestConfig) !void {
         const rx = 0;
         var mvmCpu = cpu.CPU{};
         mvmCpu.registers[rx] = testConfig.address;
+        mvmCpu.registers[cpu.CPU.LinkRegister] = 12;
 
         if (testConfig.status.negative) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.NegativeMask;
         if (testConfig.status.zero) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.ZeroMask;
@@ -538,7 +539,7 @@ fn testBranch(testConfig: BranchTestConfig) !void {
         }
 
         const linkRegister = mvmCpu.registers[cpu.CPU.LinkRegister];
-        if (updateLinkRegister) {
+        if (updateLinkRegister and testConfig.shouldJump) {
             try testing.expectEqual(previousPC, linkRegister);
         } else {
             try testing.expectEqual(previousLinkRegister, linkRegister);

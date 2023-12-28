@@ -119,11 +119,12 @@ pub const CPU = struct {
             0b1111 => {
                 // 10 bit ops
                 const branchConfigBits = @as(u2, @intCast((instruction >> 4) & 0b11));
-                const branchConfig: BranchConfig = .{ .updateLinkRegister = (branchConfigBits | 0b01) == 1 };
+                const branchConfig: BranchConfig = .{ .updateLinkRegister = (branchConfigBits & 0b01) == 1 };
                 const rx: u4 = @as(u4, @truncate(getNibble(instruction, 3)));
 
                 const lowerOpCode: u6 = @as(u6, @intCast((instruction >> 6) & 0b111111));
                 const status = self.getStatus();
+
                 switch (lowerOpCode) {
                     0 => self.handleBranch(branchConfig, rx, true), // Branch always
                     1 => self.handleBranch(branchConfig, rx, status.zero), // BranchEqual
@@ -271,18 +272,27 @@ pub const CPU = struct {
     }
 
     fn handleBranch(self: *CPU, branchConfig: BranchConfig, rx: u4, shouldBranch: bool) void {
-        if (shouldBranch) {
-            if (branchConfig.updateLinkRegister) {
-                self.registers[LinkRegister] = self.registers[ProgramCounter];
-            }
-            self.registers[ProgramCounter] = self.registers[rx];
+        if (!shouldBranch) return;
+        if (branchConfig.updateLinkRegister) {
+            self.registers[LinkRegister] = self.registers[ProgramCounter];
         }
+        self.registers[ProgramCounter] = self.registers[rx];
     }
 
-    const StatusRegisterResult = struct { zero: bool, negative: bool, overflow: bool, carry: bool };
+    const StatusRegisterResult = struct {
+        zero: bool,
+        negative: bool,
+        overflow: bool,
+        carry: bool,
+    };
 
     pub fn getStatus(self: *CPU) StatusRegisterResult {
         const status = self.registers[StatusRegister];
-        return StatusRegisterResult{ .zero = (status & ZeroMask) == ZeroMask, .negative = (status & NegativeMask) == NegativeMask, .overflow = (status & OverflowMask) == OverflowMask, .carry = (status & CarryMask) == CarryMask };
+        return StatusRegisterResult{
+            .zero = (status & ZeroMask) == ZeroMask,
+            .negative = (status & NegativeMask) == NegativeMask,
+            .overflow = (status & OverflowMask) == OverflowMask,
+            .carry = (status & CarryMask) == CarryMask,
+        };
     }
 };
