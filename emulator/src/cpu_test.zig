@@ -167,10 +167,10 @@ test "Resets zero, negative overflow and carry flags on arithmetic operations" {
 test "Writes constants to registers" {
     var mvmCpu = cpu.CPU{};
 
-    const instruction = generate1RegisterConstantInstruction(0b0100, 0, 0xFF);
+    const instruction = generate1RegisterConstantInstruction(0b0100, 0b1011, 0xFF);
     mvmCpu.execute(instruction);
 
-    try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[0]);
+    try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[11]);
 }
 
 test "Bitwise left shift correctly shifts a register" {
