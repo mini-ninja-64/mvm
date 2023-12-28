@@ -330,6 +330,7 @@ const BinaryStream = struct {
             opBinary |= argsBinary;
 
             std.debug.print("op: {b:16}\n", .{opBinary});
+            // std.debug.print("{x:2}\n", .{opBinary});
 
             try bytecode.append(@truncate((opBinary & 0xFF00) >> 8));
             try bytecode.append(@truncate(opBinary & 0x00FF));
