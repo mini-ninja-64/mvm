@@ -6,7 +6,10 @@ const TokenUnion = TokenParser.TokenUnion;
 
 pub const Number = usize;
 pub const Identifier = []const u8;
-pub const Address = []const u8;
+pub const Address = struct {
+    scoped: bool,
+    elements: std.ArrayList([]const u8),
+};
 pub const Register = struct { index: u8 };
 
 pub const ArgType = enum { Register, Number, Address };
@@ -19,7 +22,9 @@ pub const Arg = union(ArgType) {
         switch (self.*) {
             ArgType.Register => {},
             ArgType.Number => {},
-            ArgType.Address => {},
+            ArgType.Address => |*address| {
+                address.elements.clearAndFree();
+            },
         }
     }
 };
@@ -197,7 +202,16 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
                                     });
                                 }
                             },
-                            TokenType.Address => |addressToken| try args.append(Arg{ .Address = addressToken.value.items }),
+                            TokenType.Address => |addressToken| {
+                                var addressElements = std.ArrayList([]const u8).init(tokenReader.allocator);
+                                for (addressToken.value.elements.items) |addressElement| {
+                                    try addressElements.append(addressElement.items);
+                                }
+                                try args.append(Arg{ .Address = Address{
+                                    .scoped = addressToken.value.scoped,
+                                    .elements = addressElements,
+                                } });
+                            },
                             TokenType.Number => |numberToken| try args.append(Arg{ .Number = numberToken.value }),
                             else => unreachable,
                         }

@@ -268,11 +268,10 @@ const BinaryStream = struct {
                                 .value = @truncate(number),
                             } },
                             StatementParser.ArgType.Address => |address| operation: {
-                                const localAddress = std.mem.startsWith(u8, address, ".");
-                                const currentBlock = if (localAddress) blockName else "";
-                                const normalisedAddress = if (localAddress) address[1..address.len] else address;
+                                const currentBlock = if (address.scoped) blockName else "";
+
                                 break :operation Operation.Arg{
-                                    .LazyValue = try self.addressHandler.registerAddressReference(currentBlock, normalisedAddress),
+                                    .LazyValue = try self.addressHandler.registerAddressReference(currentBlock, address.elements.items),
                                 };
                             },
                         };
@@ -366,11 +365,13 @@ const AddressHandler = struct {
     addressLookup: std.StringHashMap(usize),
     allocator: std.mem.Allocator,
 
-    pub fn registerAddressReference(self: *AddressHandler, prefix: []const u8, name: []const u8) ![]const u8 {
+    pub fn registerAddressReference(self: *AddressHandler, prefix: []const u8, nameStack: []const []const u8) ![]const u8 {
         var addressName = std.ArrayList(u8).init(self.allocator);
         try addressName.appendSlice(prefix);
-        try addressName.append('.');
-        try addressName.appendSlice(name);
+        for (nameStack) |name| {
+            try addressName.append('.');
+            try addressName.appendSlice(name);
+        }
 
         if (self.addresses.get(addressName.items)) |address| {
             addressName.clearAndFree();
@@ -384,7 +385,7 @@ const AddressHandler = struct {
     }
 
     pub fn add(self: *AddressHandler, prefix: []const u8, name: []const u8, address: usize) ![]const u8 {
-        var addressName = try self.registerAddressReference(prefix, name);
+        var addressName = try self.registerAddressReference(prefix, &[_][]const u8{name});
 
         try self.addressLookup.put(addressName, address);
         return addressName;

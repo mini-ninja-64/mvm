@@ -39,13 +39,13 @@ pub const MvmaSource = struct {
         return nextByte;
     }
 
-    pub fn consumeUntil(self: *MvmaSource, delimiter: u8) std.ArrayList(u8) {
-        // self.reader.streamUntilDelimiter(string.writer(), delimiter, null) catch {};
-        // self.position += string.items.len;
+    pub fn consumeUntil(self: *MvmaSource, delimiters: []const u8) std.ArrayList(u8) {
         var string = std.ArrayList(u8).init(self.allocator);
-        while (self.consumeNext()) |char| {
-            if (char == delimiter) break;
-            string.append(char) catch {};
+        while (self.peekNext()) |char| {
+            for (delimiters) |delimiter| {
+                if (char == delimiter) return string;
+            }
+            string.append(self.consumeNext().?) catch {};
         }
         self.nextByte = null;
         return string;

@@ -20,6 +20,19 @@ pub fn Token(comptime T: type) type {
     if (T == void) return struct { value: void = {}, position: MvmaSource.FilePosition };
     return struct { value: T, position: MvmaSource.FilePosition };
 }
+
+pub const AddressToken = struct {
+    scoped: bool,
+    elements: std.ArrayList(std.ArrayList(u8)),
+
+    pub fn clearAndFree(self: *AddressToken) void {
+        for (self.elements.items) |*element| {
+            element.clearAndFree();
+        }
+        self.elements.clearAndFree();
+    }
+};
+
 pub const TokenUnion = union(TokenType) {
     BlockOpen: Token(void),
     BlockClose: Token(void),
@@ -28,7 +41,7 @@ pub const TokenUnion = union(TokenType) {
     Dot: Token(void),
     Colon: Token(void),
     Identifier: Token(std.ArrayList(u8)),
-    Address: Token(std.ArrayList(u8)),
+    Address: Token(AddressToken),
     Number: Token(u32),
     Comment: Token(std.ArrayList(u8)),
     Semicolon: Token(void),
@@ -47,9 +60,9 @@ pub const TokenUnion = union(TokenType) {
             TokenType.Comma,
             => |t| t,
             TokenType.Identifier,
-            TokenType.Address,
             TokenType.Comment,
             => |t| Token(void){ .position = t.position },
+            TokenType.Address => |t| Token(void){ .position = t.position },
             TokenType.Invalid => |t| Token(void){ .position = t.position },
             TokenType.Number => |t| Token(void){ .position = t.position },
         };
@@ -59,7 +72,14 @@ pub const TokenUnion = union(TokenType) {
 pub fn printToken(token: TokenUnion) void {
     const tokenType: TokenType = token;
     switch (token) {
-        .Address, .Identifier, .Comment => |string| {
+        .Address => |address| {
+            std.debug.print("{}: scoped: {}, elements: [ ", .{ tokenType, address.value.scoped });
+            for (address.value.elements.items) |addressElement| {
+                std.debug.print("'{s}', ", .{addressElement.items});
+            }
+            std.debug.print("] \n", .{});
+        },
+        .Identifier, .Comment => |string| {
             std.debug.print("{}: '{s}'\n", .{ tokenType, string.value.items });
         },
         .Number => |number| {
@@ -108,10 +128,6 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
                                 token = TokenUnion{ .Invalid = Token([]const u8){ .value = "Invalid number provided", .position = source.currentPosition() } };
                             }
                         },
-                        '$' => {
-                            _ = bufferClone.orderedRemove(0);
-                            token = TokenUnion{ .Address = Token(std.ArrayList(u8)){ .value = bufferClone, .position = source.currentPosition() } };
-                        },
                         else => {
                             token = TokenUnion{ .Identifier = Token(std.ArrayList(u8)){ .value = bufferClone, .position = source.currentPosition() } };
                         },
@@ -126,7 +142,7 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
                     '/' => comment: {
                         if (source.peekNext() == '/') {
                             _ = source.consumeNext();
-                            var commentValue = source.consumeUntil('\n');
+                            var commentValue = source.consumeUntil(&[_]u8{'\n'});
                             break :comment TokenUnion{ .Comment = Token(std.ArrayList(u8)){ .value = commentValue, .position = source.currentPosition() } };
                         }
                         break :comment TokenUnion{ .Invalid = Token([]const u8){ .value = "Double slashes are required for comments", .position = source.currentPosition() } };
@@ -146,8 +162,32 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
             ' ', '\n', '\t' => {},
 
             '$' => {
-                //TODO: Addresses with nested dots will not work, need to fix this hack
-                try stringBuffer.append('$');
+                //TODO: Bit hacky as does not account for newlines & whitespace
+                //      in the middle of things e.t.c, maybe this should go into
+                //      statement parser layer?
+                var addressString = source.consumeUntil(&[_]u8{ ',', ')', ' ' });
+                defer addressString.clearAndFree();
+
+                const scoped = addressString.items[0] == '.';
+
+                const normalisedAddress = if (scoped) addressString.items[1..addressString.items.len] else addressString.items;
+                var splitAddress = std.mem.split(u8, normalisedAddress, ".");
+                var addressStack = std.ArrayList(std.ArrayList(u8)).init(allocator);
+                while (splitAddress.next()) |addressElement| {
+                    var element = std.ArrayList(u8).init(allocator);
+                    try element.appendSlice(addressElement);
+                    try addressStack.append(element);
+                }
+
+                try tokens.append(TokenUnion{
+                    .Address = Token(AddressToken){
+                        .value = AddressToken{
+                            .scoped = scoped,
+                            .elements = addressStack,
+                        },
+                        .position = source.currentPosition(),
+                    },
+                });
                 if (source.peekNext() == '.') try stringBuffer.append(source.consumeNext().?);
             },
 
