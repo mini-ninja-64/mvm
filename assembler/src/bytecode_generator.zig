@@ -1,5 +1,6 @@
 const std = @import("std");
 const StatementParser = @import("./statement_parser.zig");
+const BytecodeFunctions = @import("./bytecode_operations.zig").BytecodeFunctions;
 
 const Metadata = struct { startAddress: u16 };
 const Binary = struct {
@@ -11,33 +12,15 @@ const Binary = struct {
     }
 };
 
-const ArgValidator = fn (StatementParser.Arg, u4) bool;
-const ArgValidatorPtr = *const ArgValidator;
-
-fn registerValidator(arg: StatementParser.Arg, size: u4) bool {
-    _ = size;
-    _ = arg;
-    return true;
-}
-
-fn constantValidator(arg: StatementParser.Arg, size: u4) bool {
-    _ = size;
-    _ = arg;
-    return true;
-}
-
-fn branchConfigValidator(arg: StatementParser.Arg, size: u4) bool {
-    _ = size;
-    _ = arg;
-    return true;
-}
-
 const Operation = struct {
     const Value = struct {
         value: u16,
         size: u4,
     };
-    const LazyValue = []const u8;
+    const LazyValue = struct {
+        address: []const u8,
+        size: u4,
+    };
     const ArgType = enum { Value, LazyValue };
     const Arg = union(ArgType) {
         Value: Value,
@@ -47,12 +30,10 @@ const Operation = struct {
             switch (self.*) {
                 Operation.ArgType.Value => |value| return value,
                 Operation.ArgType.LazyValue => |lazyValue| {
-                    // TODO: should probably proxy size instead of hardcoding
-                    //       and then do error reporting if too big
-                    if (addressHandler.get(lazyValue)) |address| {
+                    if (addressHandler.get(lazyValue.address)) |address| {
                         return Operation.Value{
                             .value = @truncate(address),
-                            .size = 8,
+                            .size = lazyValue.size,
                         };
                     } else {
                         return null;
@@ -70,176 +51,6 @@ const Operation = struct {
     }
 };
 
-const FunctionHandler = struct {
-    opcode: u16,
-    opcodeSize: u4,
-    argSizes: []const u4,
-    validators: []const ArgValidatorPtr,
-};
-const FUNCTION_LUT = std.ComptimeStringMap(FunctionHandler, .{
-    .{ "AddConstant", FunctionHandler{
-        .opcode = 0b0000,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 8 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &constantValidator },
-    } },
-    .{ "Add", FunctionHandler{
-        .opcode = 0b0001,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-    .{ "SubtractConstant", FunctionHandler{
-        .opcode = 0b0010,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 8 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &constantValidator },
-    } },
-    .{ "Subtract", FunctionHandler{
-        .opcode = 0b0011,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-
-    .{ "WriteConstant", FunctionHandler{
-        .opcode = 0b0100,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 8 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &constantValidator },
-    } },
-
-    .{ "ShiftLeft", FunctionHandler{
-        .opcode = 0b0101,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-    .{ "ShiftRight", FunctionHandler{
-        .opcode = 0b0110,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-    .{ "Or", FunctionHandler{
-        .opcode = 0b0111,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-    .{ "And", FunctionHandler{
-        .opcode = 0b1000,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-    .{ "Flip", FunctionHandler{
-        .opcode = 0b1001,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "Xor", FunctionHandler{
-        .opcode = 0b1010,
-        .opcodeSize = 4,
-        .argSizes = &[_]u4{ 4, 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator, &registerValidator },
-    } },
-
-    .{ "CopyRegister", FunctionHandler{
-        .opcode = 0b1110_0000,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyFromAddress", FunctionHandler{
-        .opcode = 0b1110_0001,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyToAddress", FunctionHandler{
-        .opcode = 0b1110_0010,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyHalfWordFromAddress", FunctionHandler{
-        .opcode = 0b1110_0011,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyHalfWordToAddress", FunctionHandler{
-        .opcode = 0b1110_0100,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyByteFromAddress", FunctionHandler{
-        .opcode = 0b1110_0101,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-    .{ "CopyByteToAddress", FunctionHandler{
-        .opcode = 0b1110_0110,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-
-    .{ "Compare", FunctionHandler{
-        .opcode = 0b1110_0111,
-        .opcodeSize = 8,
-        .argSizes = &[_]u4{ 4, 4 },
-        .validators = &[_]ArgValidatorPtr{ &registerValidator, &registerValidator },
-    } },
-
-    .{ "BranchAlways", FunctionHandler{
-        .opcode = 0b1111_00_0000,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchEqual", FunctionHandler{
-        .opcode = 0b1111_00_0001,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchNotEqual", FunctionHandler{
-        .opcode = 0b1111_00_0010,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchGreaterThan", FunctionHandler{
-        .opcode = 0b1111_00_0011,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchGreaterThanEqual", FunctionHandler{
-        .opcode = 0b1111_00_0100,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchLessThan", FunctionHandler{
-        .opcode = 0b1111_00_0101,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-    .{ "BranchLessThanEqual", FunctionHandler{
-        .opcode = 0b1111_00_0110,
-        .opcodeSize = 10,
-        .argSizes = &[_]u4{ 2, 4 },
-        .validators = &[_]ArgValidatorPtr{ &branchConfigValidator, &registerValidator },
-    } },
-});
-
 const BinaryStream = struct {
     metadata: Metadata,
     operations: std.ArrayList(Operation),
@@ -253,41 +64,36 @@ const BinaryStream = struct {
     }
 
     fn handleFunction(self: *BinaryStream, invocation: StatementParser.Invocation, blockName: []const u8) !void {
-        if (FUNCTION_LUT.get(invocation.identifier)) |functionDefinition| {
-            const validators = functionDefinition.validators;
-            const argSizes = functionDefinition.argSizes;
-            if (validators.len == invocation.args.items.len) {
-                // var opBinary = functionDefinition.opcode << 15 - functionDefinition.opcodeSize + 1;
-                // var argsBinary: u16 = 0;
-                // var argPosition: u8 = functionDefinition.opcodeSize;
+        if (BytecodeFunctions.get(invocation.identifier)) |functionDefinition| {
+            const argHandlers = functionDefinition.argHandlers;
+            if (argHandlers.len == invocation.args.items.len) {
                 var args = std.ArrayList(Operation.Arg).init(self.allocator);
-                for (validators, invocation.args.items, argSizes) |validator, arg, argSize| {
-                    if (!validator(arg, argSize)) {
+                for (argHandlers, invocation.args.items) |argHandler, arg| {
+                    if (!argHandler.validator(arg)) {
                         std.debug.print("invalid arg\n", .{});
                     } else {
                         const opArg: Operation.Arg = switch (arg) {
                             StatementParser.ArgType.Register => |register| Operation.Arg{ .Value = Operation.Value{
-                                .size = argSize,
+                                .size = argHandler.size,
                                 .value = register.index,
                             } },
                             StatementParser.ArgType.Number => |number| Operation.Arg{ .Value = Operation.Value{
-                                .size = argSize,
+                                .size = argHandler.size,
                                 .value = @truncate(number),
                             } },
                             StatementParser.ArgType.Address => |address| operation: {
                                 const currentBlock = if (address.scoped) blockName else "";
 
-                                break :operation Operation.Arg{
-                                    .LazyValue = try self.addressHandler.registerAddressReference(currentBlock, address.elements.items),
-                                };
+                                break :operation Operation.Arg{ .LazyValue = Operation.LazyValue{
+                                    .size = argHandler.size,
+                                    .address = try self.addressHandler.registerAddressReference(
+                                        currentBlock,
+                                        address.elements.items,
+                                    ),
+                                } };
                             },
                         };
                         try args.append(opArg);
-
-                        // argPosition += argSize;
-                        // const shiftValue = @as(u16, 16 - argPosition);
-                        // argValue <<= @truncate(shiftValue);
-                        // argsBinary |= argValue;
                     }
                 }
                 try self.operations.append(Operation{
