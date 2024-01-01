@@ -14,6 +14,9 @@ pub const BytecodeOperation = struct {
     argHandlers: []const ArgHandler,
 };
 
+// TODO: come up with better generic validation / serialization
+//       system that accounts for addresses, maybe move address
+//       fetching into serializer, idk not sure.
 fn registerValidator(arg: StatementParser.Arg) bool {
     _ = arg;
     return true;
