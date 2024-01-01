@@ -92,6 +92,7 @@ pub const CPU = struct {
                     8 => self.andOp(rx, ry, rz),
                     9 => self.flipOp(rx, ry),
                     10 => self.xorOp(rx, ry, rz),
+
                     else => std.debug.print("Error unknown instruction: '{}'", .{instruction}),
                 }
             },
