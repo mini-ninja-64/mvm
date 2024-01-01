@@ -185,59 +185,91 @@ fn handleInvocation(identifier: IdentifierToken, tokenReader: *TokenReader, erro
     var args = ArgList.init(tokenReader.allocator);
     if (typeOfToken(tokenReader.next()) == TokenType.BracketOpen) {
         _ = tokenReader.consume(); // Open bracket
-        const InvocationPhase = enum { ArgComplete, ReadyForArg };
+        const InvocationPhase = enum { ReadyForArg, ProcessingArg };
         var currentPhase = InvocationPhase.ReadyForArg;
-        while (tokenReader.consume()) |token| {
-            if (currentPhase == InvocationPhase.ReadyForArg) {
-                switch (token) {
-                    TokenType.Identifier, TokenType.Address, TokenType.Number => {
-                        switch (token) {
-                            TokenType.Identifier => |identifierToken| {
-                                if (REGISTER_LUT.get(identifierToken.value.items)) |register| {
-                                    try args.append(Arg{ .Register = register });
-                                } else {
-                                    try errors.append(ParserError{
-                                        .token = token,
-                                        .errorMessage = "Unrecognised type in argument list",
-                                    });
-                                }
-                            },
-                            TokenType.Address => |addressToken| {
-                                var addressElements = std.ArrayList([]const u8).init(tokenReader.allocator);
-                                for (addressToken.value.elements.items) |addressElement| {
-                                    try addressElements.append(addressElement.items);
-                                }
-                                try args.append(Arg{ .Address = Address{
-                                    .scoped = addressToken.value.scoped,
-                                    .elements = addressElements,
-                                } });
-                            },
-                            TokenType.Number => |numberToken| try args.append(Arg{ .Number = numberToken.value }),
-                            else => unreachable,
+        var currentArg: ?Arg = null;
+
+        while (tokenReader.next() != null) {
+            const token = tokenReader.consume().?;
+            if (token == TokenType.BracketClose) {
+                if (currentArg != null) {
+                    try args.append(currentArg.?);
+                    currentArg = null;
+                }
+                break;
+            }
+
+            switch (currentPhase) {
+                InvocationPhase.ReadyForArg => {
+                    switch (token) {
+                        TokenType.Dollar => {
+                            currentArg = Arg{ .Address = Address{
+                                .scoped = false,
+                                .elements = std.ArrayList([]const u8).init(tokenReader.allocator),
+                            } };
+                        },
+                        TokenType.Identifier => |identifierToken| {
+                            if (REGISTER_LUT.get(identifierToken.value.items)) |register| {
+                                currentArg = Arg{ .Register = register };
+                            } else {
+                                try errors.append(ParserError{
+                                    .token = token,
+                                    .errorMessage = "Unrecognised register name in argument list",
+                                });
+                            }
+                        },
+                        TokenType.Number => |numberToken| {
+                            currentArg = Arg{
+                                .Number = numberToken.value,
+                            };
+                        },
+                        else => {
+                            try errors.append(ParserError{
+                                .token = token,
+                                .errorMessage = "Illegal token found in argument list",
+                            });
+                        },
+                    }
+                    currentPhase = InvocationPhase.ProcessingArg;
+                },
+                InvocationPhase.ProcessingArg => {
+                    if (token == TokenType.Comma) {
+                        if (currentArg != null) {
+                            try args.append(currentArg.?);
+                            currentArg = null;
                         }
-                        currentPhase = InvocationPhase.ArgComplete;
-                    },
-                    TokenType.BracketClose => break,
-                    else => {
-                        try errors.append(ParserError{
-                            .token = token,
-                            .errorMessage = "Invalid token in argument list, expected an argument or ')'",
-                        });
-                        break;
-                    },
-                }
-            } else if (currentPhase == InvocationPhase.ArgComplete) {
-                switch (token) {
-                    TokenType.Comma => currentPhase = InvocationPhase.ReadyForArg,
-                    TokenType.BracketClose => break,
-                    else => {
-                        try errors.append(ParserError{
-                            .token = token,
-                            .errorMessage = "Invalid token in argument list, expected ',' or ')'",
-                        });
-                        break;
-                    },
-                }
+                        currentPhase = InvocationPhase.ReadyForArg;
+                    } else if (currentArg != null) {
+                        switch (currentArg.?) {
+                            ArgType.Address => |*addressArg| {
+                                switch (token) {
+                                    TokenType.Dot => {
+                                        if (addressArg.elements.items.len == 0) {
+                                            addressArg.scoped = true;
+                                        }
+                                    },
+                                    TokenType.Identifier => |identifierToken| {
+                                        try addressArg.elements.append(identifierToken.value.items);
+                                    },
+                                    else => {
+                                        try errors.append(ParserError{
+                                            .token = token,
+                                            .errorMessage = "Illegal token found while parsing address",
+                                        });
+                                    },
+                                }
+                            },
+                            else => {
+                                try errors.append(ParserError{
+                                    .token = token,
+                                    .errorMessage = "Found unhandled partially parsed argument",
+                                });
+                            },
+                        }
+                    } else {
+                        // TODO: I think this error is handled by the prior loop
+                    }
+                },
             }
         }
         return Invocation{ .identifier = identifier.value.items, .args = args };

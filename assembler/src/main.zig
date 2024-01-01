@@ -54,7 +54,6 @@ pub fn main() !void {
     for (tokens.items) |*token| {
         // tokenParser.printToken(token.*);
         switch (token.*) {
-            .Address => |*addressToken| addressToken.value.clearAndFree(),
             .Identifier, .Comment => |*stringToken| stringToken.value.clearAndFree(),
             else => {},
         }

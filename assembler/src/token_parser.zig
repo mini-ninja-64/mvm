@@ -8,8 +8,8 @@ pub const TokenType = enum {
     BracketClose,
     Dot,
     Colon,
+    Dollar,
     Identifier,
-    Address,
     Number,
     Comment,
     Semicolon,
@@ -21,18 +21,6 @@ pub fn Token(comptime T: type) type {
     return struct { value: T, position: MvmaSource.FilePosition };
 }
 
-pub const AddressToken = struct {
-    scoped: bool,
-    elements: std.ArrayList(std.ArrayList(u8)),
-
-    pub fn clearAndFree(self: *AddressToken) void {
-        for (self.elements.items) |*element| {
-            element.clearAndFree();
-        }
-        self.elements.clearAndFree();
-    }
-};
-
 pub const TokenUnion = union(TokenType) {
     BlockOpen: Token(void),
     BlockClose: Token(void),
@@ -40,8 +28,8 @@ pub const TokenUnion = union(TokenType) {
     BracketClose: Token(void),
     Dot: Token(void),
     Colon: Token(void),
+    Dollar: Token(void),
     Identifier: Token(std.ArrayList(u8)),
-    Address: Token(AddressToken),
     Number: Token(u32),
     Comment: Token(std.ArrayList(u8)),
     Semicolon: Token(void),
@@ -58,11 +46,11 @@ pub const TokenUnion = union(TokenType) {
             TokenType.Colon,
             TokenType.Semicolon,
             TokenType.Comma,
+            TokenType.Dollar,
             => |t| t,
             TokenType.Identifier,
             TokenType.Comment,
             => |t| Token(void){ .position = t.position },
-            TokenType.Address => |t| Token(void){ .position = t.position },
             TokenType.Invalid => |t| Token(void){ .position = t.position },
             TokenType.Number => |t| Token(void){ .position = t.position },
         };
@@ -72,13 +60,6 @@ pub const TokenUnion = union(TokenType) {
 pub fn printToken(token: TokenUnion) void {
     const tokenType: TokenType = token;
     switch (token) {
-        .Address => |address| {
-            std.debug.print("{}: scoped: {}, elements: [ ", .{ tokenType, address.value.scoped });
-            for (address.value.elements.items) |addressElement| {
-                std.debug.print("'{s}', ", .{addressElement.items});
-            }
-            std.debug.print("] \n", .{});
-        },
         .Identifier, .Comment => |string| {
             std.debug.print("{}: '{s}'\n", .{ tokenType, string.value.items });
         },
@@ -99,7 +80,7 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
 
     while (source.consumeNext()) |char| {
         switch (char) {
-            '.', ':', '/', ',', ';', '{', '}', '(', ')' => {
+            '.', ':', '/', ',', ';', '{', '}', '(', ')', '$' => {
                 if (stringBuffer.items.len > 0) {
                     const identifierLeader = stringBuffer.items[0];
                     var token: TokenUnion = undefined;
@@ -153,6 +134,7 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
                     '}' => TokenUnion{ .BlockClose = Token(void){ .position = source.currentPosition() } },
                     '(' => TokenUnion{ .BracketOpen = Token(void){ .position = source.currentPosition() } },
                     ')' => TokenUnion{ .BracketClose = Token(void){ .position = source.currentPosition() } },
+                    '$' => TokenUnion{ .Dollar = Token(void){ .position = source.currentPosition() } },
                     else => unreachable,
                 };
 
@@ -160,36 +142,6 @@ pub fn toTokens(allocator: std.mem.Allocator, source: *MvmaSource) !std.ArrayLis
             },
 
             ' ', '\n', '\t' => {},
-
-            '$' => {
-                //TODO: Bit hacky as does not account for newlines & whitespace
-                //      in the middle of things e.t.c, maybe this should go into
-                //      statement parser layer?
-                var addressString = source.consumeUntil(&[_]u8{ ',', ')', ' ' });
-                defer addressString.clearAndFree();
-
-                const scoped = addressString.items[0] == '.';
-
-                const normalisedAddress = if (scoped) addressString.items[1..addressString.items.len] else addressString.items;
-                var splitAddress = std.mem.split(u8, normalisedAddress, ".");
-                var addressStack = std.ArrayList(std.ArrayList(u8)).init(allocator);
-                while (splitAddress.next()) |addressElement| {
-                    var element = std.ArrayList(u8).init(allocator);
-                    try element.appendSlice(addressElement);
-                    try addressStack.append(element);
-                }
-
-                try tokens.append(TokenUnion{
-                    .Address = Token(AddressToken){
-                        .value = AddressToken{
-                            .scoped = scoped,
-                            .elements = addressStack,
-                        },
-                        .position = source.currentPosition(),
-                    },
-                });
-                if (source.peekNext() == '.') try stringBuffer.append(source.consumeNext().?);
-            },
 
             else => try stringBuffer.append(char),
         }
