@@ -44,7 +44,11 @@ pub fn main() !void {
             }
         }
     } else {
-        _ = try bytecodeGenerator.generateBytecode(allocator, statements.parsed.items);
+        var binary = try bytecodeGenerator.generateBytecode(allocator, statements.parsed.items);
+
+        const outputFilePath = args[2];
+        try std.fs.cwd().writeFile(outputFilePath, binary.bytecode.items);
+        binary.clearAndFree();
     }
     // std.debug.print("------------All Tokens------------\n", .{});
     for (tokens.items) |*token| {

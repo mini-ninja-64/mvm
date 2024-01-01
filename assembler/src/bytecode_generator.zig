@@ -2,7 +2,14 @@ const std = @import("std");
 const StatementParser = @import("./statement_parser.zig");
 
 const Metadata = struct { startAddress: u16 };
-const Binary = struct { metadata: Metadata, bytecode: std.ArrayList(u8) };
+const Binary = struct {
+    metadata: Metadata,
+    bytecode: std.ArrayList(u8),
+
+    pub fn clearAndFree(self: *Binary) void {
+        self.bytecode.clearAndFree();
+    }
+};
 
 const ArgValidator = fn (StatementParser.Arg, u4) bool;
 const ArgValidatorPtr = *const ArgValidator;
@@ -328,9 +335,6 @@ const BinaryStream = struct {
             }
             opBinary |= argsBinary;
 
-            std.debug.print("op: {b:16}\n", .{opBinary});
-            // std.debug.print("{x:2}\n", .{opBinary});
-
             try bytecode.append(@truncate((opBinary & 0xFF00) >> 8));
             try bytecode.append(@truncate(opBinary & 0x00FF));
         }
@@ -405,7 +409,7 @@ const AddressHandler = struct {
     }
 };
 
-pub fn generateBytecode(allocator: std.mem.Allocator, statements: []StatementParser.Statement) !void {
+pub fn generateBytecode(allocator: std.mem.Allocator, statements: []StatementParser.Statement) !Binary {
     var bs = BinaryStream{
         .addressHandler = buildAddressHandler(allocator),
         .operations = std.ArrayList(Operation).init(allocator),
@@ -415,9 +419,8 @@ pub fn generateBytecode(allocator: std.mem.Allocator, statements: []StatementPar
     defer bs.clearAndFree();
     try bs.handleBytecode(statements, "");
     var bytes = try bs.toBinary();
-    defer bytes.clearAndFree();
-    // return Binary{
-    //     .metadata = metadata,
-    //     .bytecode = bytes,
-    // };
+    return Binary{
+        .metadata = bs.metadata,
+        .bytecode = bytes,
+    };
 }
