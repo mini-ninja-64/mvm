@@ -379,10 +379,8 @@ const AddressHandler = struct {
 
         if (self.addresses.get(addressName.items)) |address| {
             addressName.clearAndFree();
-            std.debug.print("using cached addr: {s}\n", .{address.items});
             return address.items;
         } else {
-            std.debug.print("new addr: {s}\n", .{addressName.items});
             try self.addresses.put(addressName.items, addressName);
             return addressName.items;
         }
