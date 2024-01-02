@@ -42,6 +42,14 @@ pub const CPU = struct {
 
     pub const CpuError = error{OutOfBoundsFetch};
 
+    pub fn peekNext(self: *CPU) CpuError!u16 {
+        const pc = self.registers[ProgramCounter];
+        if (pc >= self.memory.len) return CpuError.OutOfBoundsFetch;
+        const upperNibble = @as(u16, self.memory[pc]) << 8;
+        const lowerNibble = @as(u16, self.memory[pc + 1]);
+        return upperNibble | lowerNibble;
+    }
+
     pub fn fetch(self: *CPU) CpuError!u16 {
         const pc = self.registers[ProgramCounter];
         if (pc >= self.memory.len) return CpuError.OutOfBoundsFetch;
@@ -64,9 +72,9 @@ pub const CPU = struct {
                 // 4 bit ops
                 const opCode = startNibble;
                 // TODO: should probably safety check instead of truncating
-                const rx = @as(u3, @truncate(getNibble(instruction, 1)));
-                const ry = @as(u3, @truncate(getNibble(instruction, 2)));
-                const rz = @as(u3, @truncate(getNibble(instruction, 3)));
+                const rx = @as(u4, @truncate(getNibble(instruction, 1)));
+                const ry = @as(u4, @truncate(getNibble(instruction, 2)));
+                const rz = @as(u4, @truncate(getNibble(instruction, 3)));
                 const constant = getByte(instruction, 1);
 
                 switch (opCode) {
@@ -84,6 +92,7 @@ pub const CPU = struct {
                     8 => self.andOp(rx, ry, rz),
                     9 => self.flipOp(rx, ry),
                     10 => self.xorOp(rx, ry, rz),
+
                     else => std.debug.print("Error unknown instruction: '{}'", .{instruction}),
                 }
             },
@@ -91,8 +100,8 @@ pub const CPU = struct {
             0b1110 => {
                 // 8 bit ops
                 const lowerOpCode: u4 = getNibble(instruction, 1);
-                const rx = @as(u3, @truncate(getNibble(instruction, 2)));
-                const ry = @as(u3, @truncate(getNibble(instruction, 3)));
+                const rx = @as(u4, @truncate(getNibble(instruction, 2)));
+                const ry = @as(u4, @truncate(getNibble(instruction, 3)));
 
                 switch (lowerOpCode) {
                     0 => self.copyRegisterOp(rx, ry),
@@ -111,11 +120,12 @@ pub const CPU = struct {
             0b1111 => {
                 // 10 bit ops
                 const branchConfigBits = @as(u2, @intCast((instruction >> 4) & 0b11));
-                const branchConfig: BranchConfig = .{ .updateLinkRegister = (branchConfigBits | 0b01) == 1 };
-                const rx: u3 = @as(u3, @truncate(getNibble(instruction, 3)));
+                const branchConfig: BranchConfig = .{ .updateLinkRegister = (branchConfigBits & 0b01) == 1 };
+                const rx: u4 = @as(u4, @truncate(getNibble(instruction, 3)));
 
                 const lowerOpCode: u6 = @as(u6, @intCast((instruction >> 6) & 0b111111));
                 const status = self.getStatus();
+
                 switch (lowerOpCode) {
                     0 => self.handleBranch(branchConfig, rx, true), // Branch always
                     1 => self.handleBranch(branchConfig, rx, status.zero), // BranchEqual
@@ -189,54 +199,54 @@ pub const CPU = struct {
         }
     }
 
-    fn addConstantOp(self: *CPU, rx: u3, constant: u8) void {
+    fn addConstantOp(self: *CPU, rx: u4, constant: u8) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.plus, constant);
         self.storeArithmeticStatus(result);
         self.registers[rx] = result.result;
     }
-    fn addOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn addOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.plus, self.registers[rz]);
         self.storeArithmeticStatus(result);
         self.registers[rx] = result.result;
     }
-    fn subtractConstantOp(self: *CPU, rx: u3, constant: u8) void {
+    fn subtractConstantOp(self: *CPU, rx: u4, constant: u8) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, constant);
         self.storeArithmeticStatus(result);
         self.registers[rx] = result.result;
     }
-    fn subtractOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn subtractOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         const result = calculateArithmeticResult(self.registers[ry], ArithmeticOperation.minus, self.registers[rz]);
         self.storeArithmeticStatus(result);
         self.registers[rx] = result.result;
     }
 
-    fn writeConstantOp(self: *CPU, rx: u3, constant: u8) void {
+    fn writeConstantOp(self: *CPU, rx: u4, constant: u8) void {
         self.registers[rx] = constant;
     }
 
-    fn shiftRightOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn shiftRightOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         self.registers[rx] = self.registers[ry] >> @truncate(self.registers[rz]);
     }
-    fn shiftLeftOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn shiftLeftOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         self.registers[rx] = self.registers[ry] << @truncate(self.registers[rz]);
     }
-    fn orOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn orOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         self.registers[rx] = self.registers[ry] | self.registers[rz];
     }
-    fn andOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn andOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         self.registers[rx] = self.registers[ry] & self.registers[rz];
     }
-    fn flipOp(self: *CPU, rx: u3, ry: u3) void {
+    fn flipOp(self: *CPU, rx: u4, ry: u4) void {
         self.registers[rx] = ~self.registers[ry];
     }
-    fn xorOp(self: *CPU, rx: u3, ry: u3, rz: u3) void {
+    fn xorOp(self: *CPU, rx: u4, ry: u4, rz: u4) void {
         self.registers[rx] = self.registers[ry] ^ self.registers[rz];
     }
 
-    fn copyRegisterOp(self: *CPU, rx: u3, ry: u3) void {
+    fn copyRegisterOp(self: *CPU, rx: u4, ry: u4) void {
         self.registers[rx] = self.registers[ry];
     }
-    fn copyFromAddress(self: *CPU, rx: u3, ry: u3, comptime length: usize) void {
+    fn copyFromAddress(self: *CPU, rx: u4, ry: u4, comptime length: usize) void {
         comptime {
             try std.testing.expect(length <= 4);
         }
@@ -246,7 +256,7 @@ pub const CPU = struct {
             self.registers[rx] |= @as(u32, self.memory[memoryAddress + i]) << shiftLength;
         }
     }
-    fn copyToAddress(self: *CPU, rx: u3, ry: u3, comptime length: usize) void {
+    fn copyToAddress(self: *CPU, rx: u4, ry: u4, comptime length: usize) void {
         comptime {
             try std.testing.expect(length <= 4);
         }
@@ -257,24 +267,33 @@ pub const CPU = struct {
         }
     }
 
-    fn compareOp(self: *CPU, rx: u3, ry: u3) void {
+    fn compareOp(self: *CPU, rx: u4, ry: u4) void {
         const result = calculateArithmeticResult(self.registers[rx], ArithmeticOperation.minus, self.registers[ry]);
         self.storeArithmeticStatus(result);
     }
 
-    fn handleBranch(self: *CPU, branchConfig: BranchConfig, rx: u3, shouldBranch: bool) void {
-        if (shouldBranch) {
-            if (branchConfig.updateLinkRegister) {
-                self.registers[LinkRegister] = self.registers[ProgramCounter];
-            }
-            self.registers[ProgramCounter] = self.registers[rx];
+    fn handleBranch(self: *CPU, branchConfig: BranchConfig, rx: u4, shouldBranch: bool) void {
+        if (!shouldBranch) return;
+        if (branchConfig.updateLinkRegister) {
+            self.registers[LinkRegister] = self.registers[ProgramCounter];
         }
+        self.registers[ProgramCounter] = self.registers[rx];
     }
 
-    const StatusRegisterResult = struct { zero: bool, negative: bool, overflow: bool, carry: bool };
+    const StatusRegisterResult = struct {
+        zero: bool,
+        negative: bool,
+        overflow: bool,
+        carry: bool,
+    };
 
     pub fn getStatus(self: *CPU) StatusRegisterResult {
         const status = self.registers[StatusRegister];
-        return StatusRegisterResult{ .zero = (status & ZeroMask) == ZeroMask, .negative = (status & NegativeMask) == NegativeMask, .overflow = (status & OverflowMask) == OverflowMask, .carry = (status & CarryMask) == CarryMask };
+        return StatusRegisterResult{
+            .zero = (status & ZeroMask) == ZeroMask,
+            .negative = (status & NegativeMask) == NegativeMask,
+            .overflow = (status & OverflowMask) == OverflowMask,
+            .carry = (status & CarryMask) == CarryMask,
+        };
     }
 };
