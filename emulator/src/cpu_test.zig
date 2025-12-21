@@ -167,10 +167,10 @@ test "Resets zero, negative overflow and carry flags on arithmetic operations" {
 test "Writes constants to registers" {
     var mvmCpu = cpu.CPU{};
 
-    const instruction = generate1RegisterConstantInstruction(0b0100, 0, 0xFF);
+    const instruction = generate1RegisterConstantInstruction(0b0100, 0b1011, 0xFF);
     mvmCpu.execute(instruction);
 
-    try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[0]);
+    try testing.expectEqual(@as(u32, 0xFF), mvmCpu.registers[11]);
 }
 
 test "Bitwise left shift correctly shifts a register" {
@@ -520,6 +520,7 @@ fn testBranch(testConfig: BranchTestConfig) !void {
         const rx = 0;
         var mvmCpu = cpu.CPU{};
         mvmCpu.registers[rx] = testConfig.address;
+        mvmCpu.registers[cpu.CPU.LinkRegister] = 12;
 
         if (testConfig.status.negative) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.NegativeMask;
         if (testConfig.status.zero) mvmCpu.registers[cpu.CPU.StatusRegister] |= cpu.CPU.ZeroMask;
@@ -538,7 +539,7 @@ fn testBranch(testConfig: BranchTestConfig) !void {
         }
 
         const linkRegister = mvmCpu.registers[cpu.CPU.LinkRegister];
-        if (updateLinkRegister) {
+        if (updateLinkRegister and testConfig.shouldJump) {
             try testing.expectEqual(previousPC, linkRegister);
         } else {
             try testing.expectEqual(previousLinkRegister, linkRegister);
